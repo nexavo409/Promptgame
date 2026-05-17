@@ -128,7 +128,9 @@ export async function generateOutput(composedPrompt) {
     return await callBackend({
       model: MODEL_GENERATE,
       messages: [{ role: 'user', content: composedPrompt }],
-      max_tokens: 1024,
+      // Lesson outputs (FAQs, structured explanations, multi-step analyses)
+      // routinely run 2-4k tokens. 1024 caused mid-sentence truncation.
+      max_tokens: 4096,
     });
   } catch (e) {
     return `【API呼び出しエラー — モック出力にフォールバック】\n${e.message}\n\n` + mockGenerate(composedPrompt);
@@ -196,7 +198,7 @@ ${output}
       model: MODEL_JUDGE,
       system: EXPLAIN_SYSTEM,
       messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 500,
+      max_tokens: 800,
     });
     return parseExplainResponse(text);
   } catch (e) {
