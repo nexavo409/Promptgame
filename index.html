@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Prompt Architect — プロンプトTCG</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <button class="brand" id="brandHome" type="button" title="ホームへ">
+      <span class="brand-mark">PA</span>
+      <span class="brand-name">Prompt Architect</span>
+      <span class="brand-sub">プロンプト・トレーディングカードゲーム</span>
+    </button>
+    <div class="header-right">
+      <span id="apiKeyStatus" class="key-status">○ モック</span>
+      <button class="header-icon-btn" id="settingsBtn" type="button" title="AIバックエンド設定">⚙</button>
+      <div id="settingsPopover" class="settings-popover hidden">
+        <h4>AI バックエンド設定</h4>
+        <label>Anthropic API キー</label>
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+        <label>LM Studio URL <span class="muted small">(任意・優先される)</span></label>
+        <input type="text" id="lmstudioInput" placeholder="http://192.168.1.3:1234" autocomplete="off" />
+        <p class="muted small">LM Studio URL が入っていればそちらを優先。両方空ならモック。</p>
+        <div class="settings-actions">
+          <button class="btn tiny ghost" id="clearKeyBtn" type="button">解除</button>
+          <button class="btn tiny primary" id="saveKeyBtn" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ HOME SCREEN ============ -->
+    <section id="screen-home" class="screen">
+      <div class="hero">
+        <h1>カードを組み合わせてAIに指示を出し、出力の良さで勝負！</h1>
+        <p>「何をする」「だれの立場で」「どう書く」をカードで組み立てると、AIが文章を作ってくれます。AIが両者の出力を採点して、点数の高い方が勝ち。</p>
+        <button class="btn ghost" id="howToPlayToggle">遊び方を表示／非表示</button>
+        <div id="howToPlay" class="howto hidden">
+          <ol>
+            <li><b>デッキを選ぶ</b>：はじめての方は下のプリセットからどれか1つ選んでください。</li>
+            <li><b>お題が出る</b>：ビジネス／学術／創作／技術／教育のいずれかからランダムに出題。</li>
+            <li><b>カードを選ぶ</b>：手札からカードを組み合わせます（コスト合計10まで）。<br>
+              <span class="muted">基本は「タスク1枚＋構造1枚」。視点や特殊カードを足すとさらに良くなります。</span></li>
+            <li><b>AIが書いて採点</b>：あなたの選んだカードから指示文ができて、AIが文章を作成。3つの観点（正しさ／役立ち／新しさ）で採点します。</li>
+            <li><b>勝負</b>：点数が高い方がそのラウンドの勝者。3ラウンド先取で勝ち！</li>
+          </ol>
+          <p class="muted">APIキー未設定でも遊べます（モック採点）。Anthropic APIキーを保存すると実際のClaudeが文章を書きます。</p>
+        </div>
+      </div>
+
+      <h2>スタータープリセット</h2>
+      <div id="presetList" class="preset-list"></div>
+
+      <h2>自分でデッキを作る</h2>
+      <p class="muted">全カードから自由に30枚を編成できます。</p>
+      <button class="btn primary" id="newDeckBtn">デッキビルダーを開く</button>
+    </section>
+
+    <!-- ============ DECK BUILDER ============ -->
+    <section id="screen-deck" class="screen hidden">
+      <div class="screen-toolbar">
+        <button class="btn ghost" id="backHomeFromDeck">← ホームに戻る</button>
+        <h2 class="screen-title">デッキビルダー</h2>
+      </div>
+      <div class="deck-builder">
+        <div class="pool-pane">
+          <div class="filters">
+            <select id="filterType">
+              <option value="all">タイプ（全て）</option>
+              <option value="task">タスク</option>
+              <option value="perspective">視点</option>
+              <option value="structure">構造</option>
+              <option value="utility">ユーティリティ</option>
+            </select>
+            <select id="filterCategory">
+              <option value="all">カテゴリ（全て）</option>
+              <option value="business">ビジネス</option>
+              <option value="academic">学術</option>
+              <option value="creative">創作</option>
+              <option value="tech">技術</option>
+              <option value="education">教育</option>
+              <option value="neutral">汎用</option>
+            </select>
+            <input type="text" id="filterText" placeholder="名前/説明で検索" />
+          </div>
+          <div id="cardPool" class="card-grid"></div>
+        </div>
+
+        <aside class="tray-pane">
+          <h3>デッキ <span id="deckSize" class="muted">0 / 30</span></h3>
+          <div id="deckTypeCounts" class="muted small"></div>
+          <ul id="deckErrors" class="errors"></ul>
+          <div class="actions">
+            <button class="btn primary" id="playWithDeckBtn" disabled>このデッキで対戦</button>
+            <button class="btn ghost" id="clearDeckBtn">空にする</button>
+          </div>
+          <div id="deckTray" class="tray"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ MATCH ============ -->
+    <section id="screen-match" class="screen hidden">
+      <div class="screen-toolbar">
+        <button class="btn ghost" id="backHomeFromMatch">← ホームに戻る（マッチを中断）</button>
+      </div>
+      <div id="matchRoot"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <footer class="app-footer">
+    <span>Prompt Architect (alpha) — designed per project spec.</span>
+  </footer>
+
+  <script type="module" src="./src/ui/app.js"></script>
+</body>
+</html>
