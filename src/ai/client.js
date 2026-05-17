@@ -24,24 +24,27 @@ export function hasAIBackend() {
   return activeBackend() !== 'mock';
 }
 
-const EXPLAIN_SYSTEM = `あなたはプロンプトエンジニアリングを教える親切で簡潔な教師です。
-以下のお題・プレイヤーが組み立てたプロンプト・AIの出力・採点結果を見て、
-初心者プレイヤーが「プロンプトの書き方」を学べるような短い解説を行ってください。
+const EXPLAIN_SYSTEM = `あなたはプロンプトエンジニアリングを教える簡潔で実用的な教師です。
+以下のお題・ユーザーが書いたプロンプト・AIの出力・採点結果を見て、
+ユーザーが次の試行でプロンプトを改善できるように短く具体的に講評してください。
 
 含めるべき要素（各 1〜2 文、合計でも 5 文以内）:
-- praise: このプロンプトの良かった点（どのカード選択が何を効かせたか、具体的に）
-- improve: もっと良くするには（次回試せる技法を 1 つ）
-- lesson: プロンプトエンジニアリング上の「ひと言レッスン」（汎用テクニック）
+- praise: このプロンプトの良かった点（書き方の具体的な工夫を取り上げる）
+- improve: 次に改善すべき点を 1 つ（プロンプトの実際の言い回しに踏み込んで示す）
+- lesson: このレッスンに関連する汎用的なプロンプト技法を 1 つ
 
 出力は厳密に以下の JSON 形式のみ（前置き・コードブロック・説明文なし）:
 {"praise": "...", "improve": "...", "lesson": "..."}`;
 
-const JUDGE_SYSTEM = `あなたはプロンプトトレーディングカードゲームの公平な審査員です。
-プレイヤーが組み立てたプロンプトと、それに対するAIの出力を読み、以下3軸でそれぞれ0〜10点の整数で採点してください。
+const JUDGE_SYSTEM = `あなたはプロンプトエンジニアリング学習アプリの公平な採点者です。
+ユーザーが書いたプロンプトと、それに対するAIの出力を読み、以下3軸でそれぞれ0〜10点の整数で採点してください。
 
 - accuracy（正確性）: お題に対する内容の的確さ、事実関係の正しさ、論理整合性
 - utility（有用性）: 実務での活用可能性、具体性、対象読者にとっての価値
-- novelty（独自性）: 他の出力との差別化、深い洞察、新しい切り口
+- novelty（独自性）: 出力の工夫、視点の良さ、差別化された切り口
+
+採点は甘すぎず、学習者が改善点を理解できるようにしてください。
+お題と無関係な出力、空欄に近い出力、誤情報を含む出力は低く採点してください。
 
 出力は厳密に以下のJSON形式のみで返してください。説明文・コードブロック・前置きは一切付けないでください。
 {"accuracy": <int 0..10>, "utility": <int 0..10>, "novelty": <int 0..10>, "rationale": "<1〜2文の根拠>"}`;
@@ -220,36 +223,40 @@ function parseExplainResponse(text) {
   };
 }
 
-function mockExplain({ topic, playedCards, judge }) {
+function mockExplain({ composedPrompt = '', judge }) {
   const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
-  const hasTask = playedCards.some(c => c.type === 'task');
-  const hasStruct = playedCards.some(c => c.type === 'structure');
-  const hasPersp = playedCards.some(c => c.type === 'perspective');
-  const matched = playedCards.filter(c => c.category === topic.category);
+  const len = composedPrompt.length;
+  const lower = composedPrompt.toLowerCase();
+  const hasRole = /あなたは|として|役割|persona|you are/i.test(composedPrompt);
+  const hasFormat = /箇条書き|表|json|markdown|形式で|フォーマット|段落|字以内|文字以内/.test(composedPrompt);
+  const hasConstraint = /しない|使わない|禁止|以内|限定|だけ/.test(composedPrompt);
+  const hasExample = /例(\d|:|：)|例えば|input.*output|example/i.test(composedPrompt);
 
-  let praise;
-  if (matched.length) {
-    praise = `お題カテゴリ（${topic.category}）に合う「${matched[0].name}」が点数を押し上げました。カードと話題の相性は大事です。`;
-  } else if (hasTask && hasStruct) {
-    praise = `タスクと構造の両方を入れた基本構成。プロンプトの背骨ができていたので AI も応えやすかったはずです。`;
-  } else {
-    praise = `${playedCards.length}枚のカードで指示を組み立てられました。少ない情報でも AI は推測で補ってくれます。`;
-  }
+  // Praise: pick what looks well-done
+  let praise = 'お題に対してプロンプトを書き、AIに具体的な指示を出せています。';
+  if (hasRole && hasFormat) praise = '「役割」と「出力形式」の両方を明示できており、AIが回答の方向性をつかみやすいプロンプトです。';
+  else if (hasRole) praise = '冒頭で役割を与えており、回答の専門性と視点が定まりやすいプロンプトです。';
+  else if (hasFormat) praise = '出力形式を明示できており、後から使い回せる構造的な回答を引き出せています。';
+  else if (hasExample) praise = '具体例を示すFew-shot的な指示ができており、AIが形式を真似しやすい構成です。';
+  else if (len > 200) praise = '一定の情報量があるプロンプトで、お題の文脈をAIに渡せています。';
 
-  let improve;
-  if (!hasPersp) improve = `「視点（だれの立場で考えるか）」を1枚加えると、出力に角度がついて差別化されます。`;
-  else if (!hasStruct) improve = `「構造（どんな形で書くか）」を入れると、AI の出力が読みやすくなります。`;
-  else if (matched.length === 0) improve = `今回はお題と相性の良いカードがありませんでした。次は ${topic.category} 系のカードも視野に入れてみましょう。`;
-  else improve = `合わせ技ボーナスを狙ってカード同士の組み合わせを意識すると、もう一段スコアが伸びます。`;
+  // Improve: pick the lowest-hanging fruit
+  let improve = '次は「役割」「出力形式」「制約」のうち、まだ書いていないものを1つ加えると安定します。';
+  if (judge.accuracy < 7) improve = '前提条件や禁止事項を明示すると、誤解や曖昧な回答を減らせます（例: 「事実に基づき、推測は明示せよ」）。';
+  else if (judge.utility < 7) improve = '実務で使いやすくするため、箇条書き・表・手順番号など出力形式を指定してみましょう。';
+  else if (judge.novelty < 7) improve = '視点を1つ加える（「初学者向け」「批判的に」など）と、ありきたりでない切り口が出やすくなります。';
+  else if (!hasExample) improve = '出力例を1〜2個示すFew-shot形式にすると、AIが期待する形式を確実に真似てくれます。';
+  else if (!hasConstraint) improve = '「○○しない」「△△字以内」など制約を1つ追加すると、回答がさらに引き締まります。';
 
   const lessons = [
-    'プロンプトは「何を／だれの立場で／どう書くか」の3要素が揃うと安定します。',
-    'AI に役割を与える（CEO・教師・批判的視点など）と出力の方向性が定まります。',
-    '出力フォーマット（箇条書き・表・JSON）を指定するだけで使い物にならない出力が減ります。',
-    '事実重視の指示を入れると幻覚（誤情報）が減りやすくなります。',
-    '同じお題でも視点を変えると違う発見が得られる、これがプロンプトを試行錯誤する価値です。',
+    'プロンプトは「目的・対象読者・出力形式」を明示するだけで安定します。',
+    'AIに役割を与えると、回答の専門性と視点が定まりやすくなります。',
+    '制約条件（字数・禁止事項）は書いた分だけ回答が引き締まります。',
+    '入出力例を1〜2個示すと、AIは形式やトーンを真似しやすくなります。',
+    '一度で完成を狙わず、出力を見てプロンプトを修正していくのが上達の近道です。',
+    '「ステップ1: ... / ステップ2: ...」と検討手順を指定すると、抜け漏れが減ります。',
   ];
-  const lesson = `[モック解説] ${lessons[(playedCards.length + total) % lessons.length]}`;
+  const lesson = `[モック解説] ${lessons[(len + total) % lessons.length]}`;
 
   return { praise, improve, lesson };
 }

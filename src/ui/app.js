@@ -183,9 +183,10 @@ function renderLesson() {
         ${lesson.hint ? `<p class="hint-line">💡 <b>ヒント:</b> ${escape(lesson.hint)}</p>` : ''}
         ${lesson.examplePrompt ? `
           <details class="example-prompt">
-            <summary>📝 サンプルプロンプトを見る</summary>
+            <summary>📝 詰まったらサンプルを見る</summary>
+            <p class="muted small">まずは自分で書いてみるのがおすすめ。それでも詰まったら参考に。</p>
             <pre>${escape(lesson.examplePrompt)}</pre>
-            <button class="btn tiny ghost" id="copyExampleBtn">サンプルをエディタに入れる</button>
+            <button class="btn tiny ghost" id="copyExampleBtn">詰まったらサンプルを使う</button>
           </details>
         ` : ''}
       </details>
@@ -311,13 +312,16 @@ function renderResult(attempt) {
   if (!area) return;
   const { prompt, output, judge, explanation, passed } = attempt;
   const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
+  const isFree = state.screen === 'free';
 
   area.innerHTML = `
-    <div class="result-block ${passed ? 'passed' : 'not-passed'}">
+    <div class="result-block ${passed ? 'passed' : isFree ? 'free' : 'not-passed'}">
       <div class="result-banner">
         ${passed
           ? `<span class="result-icon">🎉</span> <b>通過しました！</b>`
-          : `<span class="result-icon">📊</span> <b>結果: ${total.toFixed(1)} 点（通過まであと一息）</b>`}
+          : isFree
+            ? `<span class="result-icon">📊</span> <b>結果: ${total.toFixed(1)} 点</b>`
+            : `<span class="result-icon">📊</span> <b>結果: ${total.toFixed(1)} 点（通過まであと一息）</b>`}
       </div>
       <div class="result-score">
         <span>合計 <b>${total.toFixed(1)}</b> / 30</span>

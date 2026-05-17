@@ -308,6 +308,10 @@ h3 { font-size: 16px; margin: 0 0 8px; }
   border-color: #fcd34d;
   background: linear-gradient(180deg, #fffbeb 0%, #ffffff 60%);
 }
+.result-block.free {
+  border-color: #c7d2fe;
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 60%);
+}
 .result-banner {
   font-size: 17px;
   margin-bottom: 8px;
