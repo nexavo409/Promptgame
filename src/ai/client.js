@@ -129,8 +129,8 @@ export async function generateOutput(composedPrompt) {
       model: MODEL_GENERATE,
       messages: [{ role: 'user', content: composedPrompt }],
       // Lesson outputs (FAQs, structured explanations, multi-step analyses)
-      // routinely run 2-4k tokens. 1024 caused mid-sentence truncation.
-      max_tokens: 4096,
+      // can run 5-8k tokens. Be generous to avoid mid-sentence truncation.
+      max_tokens: 8192,
     });
   } catch (e) {
     return `【API呼び出しエラー — モック出力にフォールバック】\n${e.message}\n\n` + mockGenerate(composedPrompt);
