@@ -146,7 +146,7 @@ export async function judgeOutput({ topic, composedPrompt, output }) {
 ${topic.title}
 ${topic.brief}
 
-# プレイヤーが組み立てたプロンプト
+# ユーザーが書いたプロンプト
 ${composedPrompt}
 
 # AIの出力
@@ -170,20 +170,16 @@ ${output}
 }
 
 /**
- * Generate a teaching explanation for a single play result.
+ * Generate a teaching explanation for a single attempt.
  * Returns { praise, improve, lesson } strings.
  */
-export async function explainResult({ topic, composedPrompt, output, judge, playedCards = [] }) {
-  if (!hasAIBackend()) return mockExplain({ topic, composedPrompt, output, judge, playedCards });
-  const cardList = playedCards.map(c => `[${c.type}] ${c.name}: ${c.effect}`).join('\n');
+export async function explainResult({ topic, composedPrompt, output, judge }) {
+  if (!hasAIBackend()) return mockExplain({ topic, composedPrompt, output, judge });
   const userMsg = `# お題
 ${topic.title}（${topic.category} / ${topic.difficulty}）
 ${topic.brief}
 
-# プレイヤーが使ったカード
-${cardList || '(なし)'}
-
-# 組み立てられたプロンプト
+# ユーザーが書いたプロンプト
 ${composedPrompt}
 
 # AIの出力
@@ -193,7 +189,7 @@ ${output}
 正しさ ${judge.accuracy} / 役立ち ${judge.utility} / 新しさ ${judge.novelty} / 計 ${judge.accuracy + judge.utility + judge.novelty} 点
 判定根拠: ${judge.rationale || ''}
 
-このプロンプトについて、初心者にわかりやすい教師として解説してください。JSON のみで返答。`;
+このプロンプトについて、初心者にわかりやすい教師として講評してください。JSON のみで返答。`;
 
   try {
     const text = await callBackend({
@@ -204,7 +200,7 @@ ${output}
     });
     return parseExplainResponse(text);
   } catch (e) {
-    const fallback = mockExplain({ topic, composedPrompt, output, judge, playedCards });
+    const fallback = mockExplain({ topic, composedPrompt, output, judge });
     fallback.lesson = `[API解説失敗のためモック] ${fallback.lesson}`;
     return fallback;
   }
@@ -226,7 +222,6 @@ function parseExplainResponse(text) {
 function mockExplain({ composedPrompt = '', judge }) {
   const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
   const len = composedPrompt.length;
-  const lower = composedPrompt.toLowerCase();
   const hasRole = /あなたは|として|役割|persona|you are/i.test(composedPrompt);
   const hasFormat = /箇条書き|表|json|markdown|形式で|フォーマット|段落|字以内|文字以内/.test(composedPrompt);
   const hasConstraint = /しない|使わない|禁止|以内|限定|だけ/.test(composedPrompt);

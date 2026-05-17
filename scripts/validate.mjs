@@ -1,5 +1,6 @@
 // Dev validation script for the lesson-based version.
 
+import fs from 'node:fs';
 import { LESSONS, LESSON_BY_ID, FREE_TOPICS, checkPass, passText } from '../src/data/lessons.js';
 
 let failures = 0;
@@ -39,6 +40,40 @@ check('total: 合計 25 → 通過 (閾値24)',
   checkPass({ accuracy: 8, utility: 9, novelty: 8 }, { type: 'total', threshold: 24 }));
 check('total: 合計 23 → 不通過',
   !checkPass({ accuracy: 8, utility: 8, novelty: 7 }, { type: 'total', threshold: 24 }));
+
+console.log('\n=== Legacy TCG wording ===');
+// Phrases that would betray the abandoned TCG framing. These should appear
+// only in README's "履歴" section (which explains the pivot).
+const TCG_PHRASES = [
+  'トレーディングカード',
+  'カードゲーム',
+  'プレイヤーが使ったカード',
+  'プレイヤーが組み立てたプロンプト',
+  'デッキ',
+  'シナジー',
+  'レアリティ',
+  '合わせ技',
+];
+
+const filesToCheck = [
+  'src/data/lessons.js',
+  'src/game/progress.js',
+  'src/ai/client.js',
+  'src/ui/app.js',
+  'index.html',
+  'styles.css',
+];
+
+for (const rel of filesToCheck) {
+  const txt = fs.readFileSync(new URL('../' + rel, import.meta.url), 'utf8');
+  for (const phrase of TCG_PHRASES) {
+    check(`${rel} に旧TCG文言「${phrase}」がない`, !txt.includes(phrase));
+  }
+}
+
+// Also check that LESSON definitions don't mention raw "CoT" by itself.
+const lessonsText = fs.readFileSync(new URL('../src/data/lessons.js', import.meta.url), 'utf8');
+check('lessons.js に独立した "CoT" 表記がない', !/\bCoT\b/.test(lessonsText));
 
 console.log(`\n=== ${failures === 0 ? 'OK' : `FAILED: ${failures}`} ===`);
 process.exit(failures === 0 ? 0 : 1);

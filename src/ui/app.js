@@ -289,7 +289,7 @@ async function onTry() {
     setResolvingStatus('採点中…');
     const judge = await judgeOutput({ topic, composedPrompt: prompt, output });
     setResolvingStatus('教師が解説中…');
-    const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge, playedCards: [] });
+    const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
     const passed = checkPass(judge, lesson.passCondition);
     const attempt = { prompt, output, judge, explanation, passed };
@@ -447,7 +447,7 @@ async function onTryFree() {
     setResolvingStatus('採点中…');
     const judge = await judgeOutput({ topic, composedPrompt: prompt, output });
     setResolvingStatus('教師が解説中…');
-    const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge, playedCards: [] });
+    const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
     state.attempt = { prompt, output, judge, explanation, passed: false };
     renderFree();
