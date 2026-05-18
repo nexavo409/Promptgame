@@ -518,65 +518,12 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   50%      { opacity: 1;   transform: scale(1.2); }
 }
 
-/* Particles. 6 explicit keyframes (no CSS vars in calc — Chrome desktop
-   was dropping the animation entirely when var() lived inside translate's
-   calc()). Each particle gets its own named animation. */
-.hero-particle { opacity: 0; }
-.pl-1 { animation: hero-pl-up   2.4s linear infinite; }
-.pl-2 { animation: hero-pl-mid  2.4s linear 0.8s infinite; }
-.pl-3 { animation: hero-pl-down 2.4s linear 1.6s infinite; }
-.pr-1 { animation: hero-pr-up   2.4s linear infinite; }
-.pr-2 { animation: hero-pr-mid  2.4s linear 1.0s infinite; }
-.pr-3 { animation: hero-pr-down 2.4s linear 1.8s infinite; }
-
-@keyframes hero-pl-up {
-  0%   { transform: translate(92px,  110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(116px, 88px);  }
-  85%  { opacity: 1; }
-  100% { transform: translate(140px, 110px); opacity: 0; }
-}
-@keyframes hero-pl-mid {
-  0%   { transform: translate(92px,  110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(116px, 110px); }
-  85%  { opacity: 1; }
-  100% { transform: translate(140px, 110px); opacity: 0; }
-}
-@keyframes hero-pl-down {
-  0%   { transform: translate(92px,  110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(116px, 132px); }
-  85%  { opacity: 1; }
-  100% { transform: translate(140px, 110px); opacity: 0; }
-}
-@keyframes hero-pr-up {
-  0%   { transform: translate(140px, 110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(164px, 88px);  }
-  85%  { opacity: 1; }
-  100% { transform: translate(188px, 110px); opacity: 0; }
-}
-@keyframes hero-pr-mid {
-  0%   { transform: translate(140px, 110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(164px, 110px); }
-  85%  { opacity: 1; }
-  100% { transform: translate(188px, 110px); opacity: 0; }
-}
-@keyframes hero-pr-down {
-  0%   { transform: translate(140px, 110px); opacity: 0; }
-  15%  { opacity: 1; }
-  50%  { transform: translate(164px, 132px); }
-  85%  { opacity: 1; }
-  100% { transform: translate(188px, 110px); opacity: 0; }
-}
+/* Particle motion is handled by SMIL animateTransform inline in the SVG —
+   reliable on both Chrome desktop and iOS Safari. CSS animations on SVG
+   <g> elements were inconsistent across browsers. */
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-halo, .hero-orb-group, .hero-spark, .hero-particle {
-    animation: none !important;
-  }
-  .hero-particle { opacity: 0.4; }
+  .hero-halo, .hero-orb-group, .hero-spark { animation: none !important; }
 }
 
 :root[data-theme="dark"] .hero-card-bg { fill: #1e293b; stroke: #334155; }
@@ -1716,6 +1663,13 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
     transform: translateY(110%);
     transition: transform 0.18s ease;
     pointer-events: none;
+  }
+
+  /* Dark mode override — the sticky bar's hardcoded rgba(255,255,255,.96)
+     becomes an opaque white island in an otherwise dark page. */
+  :root[data-theme="dark"] .editor-actions {
+    background: rgba(15, 23, 42, 0.92);
+    border-top-color: var(--line);
   }
 
   /* Markdown text bumps slightly for mobile reading */
