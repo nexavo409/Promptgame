@@ -1,9 +1,10 @@
 // Prompt Architect — Lesson-based prompt engineering tutor.
 
 import { LESSONS, LESSON_BY_ID, FREE_TOPICS, CATEGORY_LABEL, checkPass, passText } from '../data/lessons.js';
+import { loadCustomTopics, saveCustomTopic, updateCustomTopic, deleteCustomTopic, getCustomTopic } from '../data/custom-topics.js';
 import { loadLessonProgress, recordAttempt, resetLesson, unlockedLessons,
          saveDraft, loadDraft, clearDraft } from '../game/progress.js';
-import { generateOutput, judgeOutput, explainResult, improvePrompt,
+import { generateOutput, judgeOutput, explainResult, improvePrompt, generateAIPrompt,
          hasApiKey, setApiKey, getApiKey,
          hasAIBackend, activeBackend,
          getOpenAIURL, setOpenAIURL, getOpenAIBearer, setOpenAIBearer } from '../ai/client.js';
@@ -13,8 +14,10 @@ import { renderMarkdown } from '../util/markdown.js';
 const state = {
   screen: 'home',         // home | lesson | free
   currentLesson: null,
-  currentTopic: null,     // for free mode
+  currentTopic: null,     // for free / custom mode
+  customMode: false,      // true when the current topic is a user-defined one
   attempt: null,          // { prompt, output, judge, explanation, passed } | null
+  vsAttempt: null,        // AI's competing attempt (for "AI vs You" mode)
   compare: new Set(),     // history indices selected for diff compare
   draftSource: 'user',    // 'user' | 'ai-improved' | 'sample' — origin tag for the current draft
   busy: false,
@@ -242,6 +245,144 @@ function renderHome() {
     `;
     free.querySelector('#freePracticeBtn').addEventListener('click', openFreePractice);
   }
+
+  renderCustomTopics();
+}
+
+// ============== Custom topics (My Topics) ==============
+function renderCustomTopics() {
+  const host = document.getElementById('customTopicsArea');
+  if (!host) return;
+  const list = loadCustomTopics();
+
+  let html = `
+    <div class="custom-topics-bar">
+      <button class="btn primary" id="newCustomTopicBtn">＋ 新規お題を作る</button>
+    </div>
+  `;
+
+  if (list.length === 0) {
+    html += `<div class="custom-empty muted small">まだ自作お題はありません。「＋ 新規お題を作る」から追加してみよう。</div>`;
+  } else {
+    html += '<div class="custom-list">';
+    for (const t of list) {
+      html += `
+        <div class="lesson-row custom" data-id="${escape(t.id)}">
+          <div class="lesson-num">🛠️</div>
+          <div class="lesson-meta">
+            <div class="lesson-title">${escape(t.title || '(無題)')}</div>
+            <div class="lesson-tech muted small">
+              <span class="badge cat">${escape(CATEGORY_LABEL[t.category] || t.category)}</span>
+              <span class="badge">${t.difficulty === 'high' ? '難易度: 高' : '難易度: 標準'}</span>
+            </div>
+            <div class="lesson-summary">${escape((t.brief || '').slice(0, 120))}${(t.brief || '').length > 120 ? '…' : ''}</div>
+          </div>
+          <div class="lesson-status"><div class="lesson-status-icon">▶</div></div>
+          <div class="lesson-actions custom-actions">
+            <button class="btn primary" data-act="practice">練習する</button>
+            <button class="btn ghost tiny" data-act="edit">編集</button>
+            <button class="btn ghost tiny" data-act="delete" title="削除">🗑️</button>
+          </div>
+        </div>
+      `;
+    }
+    html += '</div>';
+  }
+  host.innerHTML = html;
+
+  host.querySelector('#newCustomTopicBtn').addEventListener('click', () => openCustomTopicEditor(null));
+  host.querySelectorAll('.lesson-row.custom').forEach(row => {
+    const id = row.dataset.id;
+    row.querySelector('[data-act=practice]').addEventListener('click', () => openCustomTopicPractice(id));
+    row.querySelector('[data-act=edit]').addEventListener('click', () => openCustomTopicEditor(id));
+    row.querySelector('[data-act=delete]').addEventListener('click', () => {
+      const t = getCustomTopic(id);
+      if (!t) return;
+      if (confirm(`お題「${t.title}」を削除しますか？\n（過去の試行履歴も同時に削除されます）`)) {
+        deleteCustomTopic(id);
+        // Also clean up its practice history slot
+        try { Object.keys(localStorage).filter(k => k.startsWith('pa.progress.custom.' + id)).forEach(k => localStorage.removeItem(k)); } catch {}
+        renderCustomTopics();
+      }
+    });
+  });
+}
+
+function openCustomTopicEditor(editingId) {
+  const existing = editingId ? getCustomTopic(editingId) : null;
+  const isEdit = !!existing;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal custom-editor">
+      <h3>${isEdit ? '✏️ お題を編集' : '＋ 新しいお題を作る'}</h3>
+      <p class="muted small">自分の実務課題や、興味のあるテーマでプロンプトを練習できます。</p>
+
+      <label class="form-label">お題タイトル <span class="muted small">(必須・1〜100文字)</span></label>
+      <input type="text" id="ctTitle" placeholder="例: 新人向け Git/GitHub 入門資料" maxlength="200" value="${escape(existing?.title || '')}" />
+
+      <label class="form-label">詳細・課題内容 <span class="muted small">(AIに伝える具体的な内容)</span></label>
+      <textarea id="ctBrief" rows="5" placeholder="例: 新入社員 5 名向けに、Git の基本操作（clone / add / commit / push / pull）を 30分で理解できる資料を作りたい。図解と例を含めること。" maxlength="2000">${escape(existing?.brief || '')}</textarea>
+
+      <div class="form-row">
+        <div>
+          <label class="form-label">カテゴリ</label>
+          <select id="ctCategory">
+            <option value="business" ${existing?.category === 'business' ? 'selected' : ''}>ビジネス</option>
+            <option value="tech" ${existing?.category === 'tech' ? 'selected' : ''}>技術</option>
+            <option value="creative" ${existing?.category === 'creative' ? 'selected' : ''}>創作</option>
+            <option value="education" ${existing?.category === 'education' || (!existing && true) ? 'selected' : ''}>教育</option>
+            <option value="academic" ${existing?.category === 'academic' ? 'selected' : ''}>学術</option>
+            <option value="neutral" ${existing?.category === 'neutral' ? 'selected' : ''}>汎用</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">難易度</label>
+          <select id="ctDifficulty">
+            <option value="standard" ${existing?.difficulty !== 'high' ? 'selected' : ''}>標準</option>
+            <option value="high" ${existing?.difficulty === 'high' ? 'selected' : ''}>高</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn ghost" id="ctCancelBtn">キャンセル</button>
+        <button class="btn primary" id="ctSaveBtn">${isEdit ? '保存' : '作成'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#ctCancelBtn').addEventListener('click', () => document.body.removeChild(overlay));
+  overlay.querySelector('#ctSaveBtn').addEventListener('click', () => {
+    const title = overlay.querySelector('#ctTitle').value.trim();
+    const brief = overlay.querySelector('#ctBrief').value.trim();
+    const category = overlay.querySelector('#ctCategory').value;
+    const difficulty = overlay.querySelector('#ctDifficulty').value;
+    if (!title) { flash('タイトルを入力してください'); return; }
+    if (!brief) { flash('課題内容を入力してください'); return; }
+    if (isEdit) {
+      updateCustomTopic(editingId, { title, brief, category, difficulty });
+    } else {
+      saveCustomTopic({ title, brief, category, difficulty });
+    }
+    document.body.removeChild(overlay);
+    renderCustomTopics();
+  });
+}
+
+function openCustomTopicPractice(id) {
+  const t = getCustomTopic(id);
+  if (!t) return;
+  state.currentLesson = null;
+  state.currentTopic = t;
+  state.attempt = null;
+  state.compare = new Set();
+  state.draftSource = 'user';
+  state.customMode = true;
+  show('free');
+  renderFree();
 }
 
 // ============== Lesson screen ==============
@@ -253,6 +394,8 @@ function openLesson(lessonId) {
   state.attempt = null;
   state.compare = new Set();
   state.draftSource = 'user';
+  state.customMode = false;
+  state.vsAttempt = null;
   show('lesson');
   renderLesson();
 }
@@ -478,6 +621,7 @@ async function onTry() {
     const source = state.draftSource;
     const attempt = { prompt, output, judge, explanation, passed, source };
     state.attempt = attempt;
+    state.vsAttempt = null;
     recordAttempt(lesson.id, attempt);
     clearDraft(draftSlot());
     state.draftSource = 'user';
@@ -536,11 +680,15 @@ function renderResult(attempt) {
         <p class="lesson"><b>💡 今日のレッスン:</b> ${escape(explanation.lesson)}</p>
       </div>
       <div class="result-actions">
+        <button class="btn ghost" id="vsAiBtn" title="同じお題でAIにもプロンプトを書かせて比較します">
+          🤖 AI の解答も見る
+        </button>
         ${passed && state.currentLesson && nextLesson(state.currentLesson.id)
           ? `<button class="btn primary" id="nextLessonBtn">次のレッスンへ →</button>`
           : ''}
         <button class="btn ghost" id="backToHomeBtn">← レッスン一覧へ</button>
       </div>
+      <div id="vsAiArea"></div>
     </div>
   `;
   document.getElementById('backToHomeBtn')?.addEventListener('click', () => show('home'));
@@ -549,11 +697,90 @@ function renderResult(attempt) {
     if (nxt) openLesson(nxt.id);
   });
   document.getElementById('aiImproveBtn')?.addEventListener('click', () => onAIImprove(attempt));
+  document.getElementById('vsAiBtn')?.addEventListener('click', () => onVsAI(attempt));
+
+  // If we already have AI's competing attempt for this round, surface it again
+  if (state.vsAttempt) renderVsAI(state.vsAttempt, attempt);
 
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
   // Set the prompt back into textarea so user sees what they sent
   const ta = document.getElementById('promptInput');
   if (ta && !ta.value) ta.value = prompt;
+}
+
+async function onVsAI(userAttempt) {
+  if (state.busy) return;
+  const topic = state.currentTopic;
+  if (!topic || !userAttempt) return;
+
+  state.busy = true;
+  const btn = document.getElementById('vsAiBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 AI も書いてます…'; }
+  const host = document.getElementById('vsAiArea');
+  if (host) host.innerHTML = `<div class="vs-loading">🤖 AIが同じお題に挑戦中…</div>`;
+
+  try {
+    const aiPrompt = await generateAIPrompt(topic);
+    const aiOutput = await generateOutput(aiPrompt);
+    const aiJudge = await judgeOutput({ topic, composedPrompt: aiPrompt, output: aiOutput });
+    const vsAttempt = { prompt: aiPrompt, output: aiOutput, judge: aiJudge };
+    state.vsAttempt = vsAttempt;
+    renderVsAI(vsAttempt, userAttempt);
+  } catch (e) {
+    if (host) host.innerHTML = `<div class="vs-loading" style="color:#dc2626">エラー: ${escape(e.message)}</div>`;
+  } finally {
+    state.busy = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI の解答も見る'; }
+  }
+}
+
+function renderVsAI(vsAttempt, userAttempt) {
+  const host = document.getElementById('vsAiArea');
+  if (!host) return;
+  const userTotal = (userAttempt.judge.accuracy || 0) + (userAttempt.judge.utility || 0) + (userAttempt.judge.novelty || 0);
+  const aiTotal = (vsAttempt.judge.accuracy || 0) + (vsAttempt.judge.utility || 0) + (vsAttempt.judge.novelty || 0);
+  const delta = userTotal - aiTotal;
+  const verdict = delta > 0.5 ? '🏆 あなたの勝ち' : delta < -0.5 ? '🤖 AI の勝ち' : '🤝 ほぼ互角';
+
+  host.innerHTML = `
+    <div class="vs-panel">
+      <div class="vs-head">
+        <h4>🥊 AI vs あなた</h4>
+        <div class="vs-verdict">${verdict}</div>
+      </div>
+      <div class="vs-summary">
+        <div class="vs-stat you">
+          <div class="vs-label">あなた</div>
+          <div class="vs-total">${userTotal.toFixed(1)}</div>
+          <div class="vs-axes muted small">正${userAttempt.judge.accuracy} / 役${userAttempt.judge.utility} / 新${userAttempt.judge.novelty}</div>
+        </div>
+        <div class="vs-vs">vs</div>
+        <div class="vs-stat ai">
+          <div class="vs-label">🤖 AI</div>
+          <div class="vs-total">${aiTotal.toFixed(1)}</div>
+          <div class="vs-axes muted small">正${vsAttempt.judge.accuracy} / 役${vsAttempt.judge.utility} / 新${vsAttempt.judge.novelty}</div>
+        </div>
+      </div>
+
+      <details class="vs-detail" open>
+        <summary>🤖 AI が書いたプロンプト（お手本として参考に）</summary>
+        <pre>${escape(vsAttempt.prompt)}</pre>
+      </details>
+      <details class="vs-detail">
+        <summary>🤖 AI の出力</summary>
+        <div class="md-body">${renderMarkdown(vsAttempt.output)}</div>
+      </details>
+      <details class="vs-detail">
+        <summary>判定の根拠</summary>
+        <p class="muted small">${escape(vsAttempt.judge.rationale || '—')}</p>
+      </details>
+      <p class="vs-tip muted small">
+        💡 AI のプロンプトの工夫を観察して、次の試行に取り入れてみよう。
+        「AI vs You」は対戦ではなく、上手な書き手のお手本を見るための機能です。
+      </p>
+    </div>
+  `;
+  host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function onAIImprove(attempt) {
@@ -600,12 +827,18 @@ function openFreePractice() {
   state.attempt = null;
   state.compare = new Set();
   state.draftSource = 'user';
+  state.customMode = false;
+  state.vsAttempt = null;
   show('free');
   renderFree();
 }
 
 function freeSlotId() {
-  return state.currentTopic ? 'free.' + state.currentTopic.id : null;
+  if (!state.currentTopic) return null;
+  // Custom-topic histories live under their own slot prefix so they don't
+  // collide with the random free topics.
+  const prefix = state.customMode ? 'custom' : 'free';
+  return `${prefix}.${state.currentTopic.id}`;
 }
 
 function randomFreeTopic() {
@@ -618,11 +851,12 @@ function renderFree() {
   const p = slot ? loadLessonProgress(slot) : { history: [] };
 
   const root = document.getElementById('freeRoot');
+  const isCustom = state.customMode;
   root.innerHTML = `
     <div class="screen-toolbar">
       <button class="btn ghost" id="backToHomeFromFree">← レッスン一覧</button>
-      <span class="muted small">自由練習モード</span>
-      <button class="btn tiny ghost" id="reshuffleBtn" style="margin-left:auto">🔄 別のお題</button>
+      <span class="muted small">${isCustom ? '🛠️ マイお題' : '🆓 自由練習モード'}</span>
+      <button class="btn tiny ghost" id="reshuffleBtn" style="margin-left:auto">${isCustom ? '別のお題を選ぶ →' : '🔄 別のお題'}</button>
     </div>
 
     <div class="lesson-pane">
@@ -630,7 +864,7 @@ function renderFree() {
         <div class="topic-meta">
           <span class="badge cat">${escape(CATEGORY_LABEL[topic.category] || topic.category)}</span>
           <span class="badge">${topic.difficulty === 'high' ? '難易度: 高' : '難易度: 標準'}</span>
-          <span class="badge">自由練習（通過条件なし）</span>
+          <span class="badge">${isCustom ? '自作お題（通過条件なし）' : '自由練習（通過条件なし）'}</span>
           ${p.bestScore ? `<span class="badge passed">このお題のベスト ${p.bestScore.total.toFixed(1)}</span>` : ''}
         </div>
         <h2>お題: ${escape(topic.title)}</h2>
@@ -660,11 +894,17 @@ function renderFree() {
 
   document.getElementById('backToHomeFromFree').addEventListener('click', () => show('home'));
   document.getElementById('reshuffleBtn').addEventListener('click', () => {
-    state.currentTopic = randomFreeTopic();
-    state.attempt = null;
-    state.compare = new Set();
-    state.draftSource = 'user';
-    renderFree();
+    if (state.customMode) {
+      // For custom topics, go back to the list (home) so user can pick another
+      show('home');
+    } else {
+      state.currentTopic = randomFreeTopic();
+      state.attempt = null;
+      state.compare = new Set();
+      state.draftSource = 'user';
+      state.vsAttempt = null;
+      renderFree();
+    }
   });
   const ta = document.getElementById('promptInput');
   const draft = loadDraft(draftSlot());
@@ -703,6 +943,7 @@ async function onTryFree() {
     const source = state.draftSource;
     const attempt = { prompt, output, judge, explanation, passed: false, source };
     state.attempt = attempt;
+    state.vsAttempt = null;
     const slot = freeSlotId();
     if (slot) recordAttempt(slot, attempt);
     clearDraft(draftSlot());

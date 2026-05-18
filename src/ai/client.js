@@ -254,6 +254,62 @@ ${output}
   }
 }
 
+const META_PROMPT_SYSTEM = `あなたはプロンプトエンジニアリングの専門家です。
+与えられたお題に対して、高得点を取れる「お手本となるプロンプト」を 1 つ書いてください。
+
+含めるべき要素（必要に応じて取捨選択）:
+- 役割の付与 ("あなたは○○です")
+- 出力形式の明示 (箇条書き / 表 / 段落数など)
+- 制約条件 (字数・禁止事項など)
+- 必要なら例示 (Few-shot) や段階的な検討手順
+- 対象読者の明確化
+
+ルール:
+- プロンプト本文だけを返す
+- 説明・前置き・コードフェンスは一切付けない
+- 元のお題の意図を尊重する`;
+
+/**
+ * Have the AI write its own prompt for the given topic. Used for "AI vs You".
+ */
+export async function generateAIPrompt(topic) {
+  if (!hasAIBackend()) return mockAIPrompt(topic);
+  const userMsg = `お題: ${topic.title}
+${topic.brief}
+
+このお題に対する高品質なプロンプトを 1 つ書いてください。`;
+  try {
+    const text = await callBackend({
+      model: MODEL_GENERATE,
+      system: META_PROMPT_SYSTEM,
+      messages: [{ role: 'user', content: userMsg }],
+      max_tokens: 2048,
+    });
+    return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+  } catch (e) {
+    return mockAIPrompt(topic);
+  }
+}
+
+function mockAIPrompt(topic) {
+  return `あなたは ${topic.category === 'tech' ? '経験豊富なシニアエンジニア' :
+          topic.category === 'business' ? '実務経験豊富なコンサルタント' :
+          topic.category === 'education' ? 'ベテランの教育者' :
+          topic.category === 'creative' ? 'プロのライター' :
+          topic.category === 'academic' ? '学術研究者' : '専門家'} です。
+
+お題: ${topic.title}
+${topic.brief}
+
+以下の構造で回答してください:
+1. 概要 (3行以内で要点を提示)
+2. 詳細 (箇条書き 3〜5項目で展開)
+3. 結論・推奨アクション
+
+対象読者: 想定される初学者にも理解できるよう、専門用語は補足してください。
+制約: 推測や憶測は明示し、事実と意見を分けてください。`;
+}
+
 const IMPROVE_SYSTEM = `あなたはプロンプトエンジニアリングの実務コーチです。
 ユーザーが書いた既存のプロンプトと、教師からの改善提案を1つ受け取り、
 その提案だけを丁寧に反映した「改善版プロンプト」を返してください。
