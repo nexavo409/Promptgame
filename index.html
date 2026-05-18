@@ -69,10 +69,60 @@
   <main>
     <!-- ============ HOME (lesson list) ============ -->
     <section id="screen-home" class="screen">
+      <!-- HERO -->
       <div class="hero">
-        <h1>プロンプトの書き方を、お題と試行錯誤で身につける。</h1>
-        <p>1 つの技法を 1 レッスンで学べる構成。実際に書いて、AI に試させて、教師AIに講評してもらいながら進めます。</p>
+        <span class="hero-eyebrow">プロンプトエンジニアリング学習ツール</span>
+        <h1>プロンプトの書き方を、<br><em>書きながら</em>身につける。</h1>
+        <p>
+          実際にプロンプトを書いて、AI に試させて、教師AI に講評してもらう。<br>
+          8 つのレッスンで「役割」「構造」「制約」「Few-shot」「自己批評」までを段階的に学べます。
+        </p>
+        <div class="hero-cta">
+          <button class="btn primary big" id="startLessonOneBtn">▶ Lesson 1 から始める</button>
+          <button class="btn ghost" id="exploreLibraryBtn">📚 プロンプトライブラリを見る</button>
+        </div>
       </div>
+
+      <!-- WHY: 3-column value proposition -->
+      <section class="value-grid">
+        <div class="value-card">
+          <div class="value-icon">🛠️</div>
+          <h3>実際に書いて学ぶ</h3>
+          <p>「読むだけ」のドキュメントは閉じてしまう。手を動かしてプロンプトを書き、AI の反応を見ながら覚える設計。</p>
+        </div>
+        <div class="value-card">
+          <div class="value-icon">📊</div>
+          <h3>AI が即フィードバック</h3>
+          <p>3 軸（正しさ / 役立ち / 新しさ）でスコア化。教師AI が「何が効いたか / どう改善すべきか」を講評。</p>
+        </div>
+        <div class="value-card">
+          <div class="value-icon">💼</div>
+          <h3>実務に直結</h3>
+          <p>マイお題機能で、明日の会議資料や報告メールをそのまま練習材料に。学んだ瞬間に現場で使える。</p>
+        </div>
+      </section>
+
+      <!-- HOW: 3-step flow -->
+      <section class="how-section">
+        <h2>使い方は 3 ステップ</h2>
+        <div class="how-steps">
+          <div class="how-step">
+            <div class="how-num">1</div>
+            <h4>お題を読む</h4>
+            <p>「Reactの状態管理を新人に説明」など、具体的な課題が提示されます。</p>
+          </div>
+          <div class="how-step">
+            <div class="how-num">2</div>
+            <h4>プロンプトを書く</h4>
+            <p>自分の言葉で AI への指示を組み立て、「試す」を押して送信。</p>
+          </div>
+          <div class="how-step">
+            <div class="how-num">3</div>
+            <h4>採点と講評を読む</h4>
+            <p>AI の出力 + 採点 + 教師AI の改善提案。納得行くまで何度でも試行可能。</p>
+          </div>
+        </div>
+      </section>
 
       <h2>📚 レッスン</h2>
       <p class="muted">1 → 8 の順に通過していくと、プロンプトエンジニアリングの基本技法が一通り身につきます。</p>
@@ -96,12 +146,60 @@
     <section id="screen-free" class="screen hidden">
       <div id="freeRoot"></div>
     </section>
+
+    <!-- ============ LIBRARY ============ -->
+    <section id="screen-library" class="screen hidden">
+      <div id="libraryRoot"></div>
+    </section>
+
+    <!-- ============ ABOUT ============ -->
+    <section id="screen-about" class="screen hidden">
+      <div id="aboutRoot"></div>
+    </section>
   </main>
 
   <div id="toast" class="toast"></div>
 
   <footer class="app-footer">
-    <span>Prompt Architect — プロンプトエンジニアリング学習ツール (alpha)</span>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-mark">
+          <svg viewBox="0 0 40 40" width="28" height="28">
+            <defs>
+              <linearGradient id="footerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#8b5cf6" />
+              </linearGradient>
+            </defs>
+            <path d="M5 9 Q5 4 10 4 L30 4 Q35 4 35 9 L35 23 Q35 28 30 28 L18 28 L12 34 L13 28 L10 28 Q5 28 5 23 Z" fill="url(#footerGrad)" />
+            <circle cx="14" cy="16" r="2" fill="white" />
+            <circle cx="20" cy="16" r="2" fill="white" />
+            <circle cx="26" cy="16" r="2" fill="white" />
+          </svg>
+        </div>
+        <div>
+          <div class="footer-name">Prompt Architect</div>
+          <div class="footer-tag muted small">手を動かしてプロンプトを学ぶ</div>
+        </div>
+      </div>
+
+      <div class="footer-section">
+        <div class="footer-heading">サイト</div>
+        <a href="#" data-nav="home">ホーム</a>
+        <a href="#" data-nav="library">📚 プロンプトライブラリ</a>
+        <a href="#" data-nav="about">📖 このアプリについて</a>
+      </div>
+
+      <div class="footer-section">
+        <div class="footer-heading">開発</div>
+        <a href="https://github.com/nexavo409/Promptgame" target="_blank" rel="noopener">GitHub リポジトリ ↗</a>
+        <a href="https://github.com/nexavo409/Promptgame/issues" target="_blank" rel="noopener">バグ報告 / 要望 ↗</a>
+        <span class="footer-version muted small">v0.1.0-alpha</span>
+      </div>
+    </div>
+    <div class="footer-bottom muted small">
+      © 2026 Prompt Architect — MIT License · 学習ツール / 商用利用OK
+    </div>
   </footer>
 
   <script type="module" src="./src/ui/app.js"></script>

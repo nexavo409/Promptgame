@@ -2,6 +2,7 @@
 
 import { LESSONS, LESSON_BY_ID, FREE_TOPICS, CATEGORY_LABEL, checkPass, passText } from '../data/lessons.js';
 import { loadCustomTopics, saveCustomTopic, updateCustomTopic, deleteCustomTopic, getCustomTopic } from '../data/custom-topics.js';
+import { PROMPT_CATEGORIES, PROMPT_LIBRARY, getPromptsByCategory } from '../data/prompt-library.js';
 import { loadLessonProgress, recordAttempt, resetLesson, unlockedLessons,
          saveDraft, loadDraft, clearDraft } from '../game/progress.js';
 import { generateOutput, judgeOutput, explainResult, improvePrompt, generateAIPrompt,
@@ -61,9 +62,20 @@ function attachMobileKeyboardScroll(ta) {
 document.addEventListener('DOMContentLoaded', () => {
   bindHeader();
   bindHome();
+  bindFooter();
   show('home');
   initKeyboardDetection();
 });
+
+function bindFooter() {
+  document.querySelectorAll('.app-footer a[data-nav]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const screen = a.dataset.nav;
+      if (['home', 'library', 'about'].includes(screen)) show(screen);
+    });
+  });
+}
 
 /**
  * Detect iOS / Android on-screen keyboard via visualViewport.
@@ -102,8 +114,9 @@ function initKeyboardDetection() {
 function show(screen) {
   const prev = state.screen;
   state.screen = screen;
-  for (const s of ['home', 'lesson', 'free']) {
-    document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== screen);
+  for (const s of ['home', 'lesson', 'free', 'library', 'about']) {
+    const el = document.getElementById(`screen-${s}`);
+    if (el) el.classList.toggle('hidden', s !== screen);
   }
   // Clear non-active screen roots so duplicate IDs (e.g. #promptInput) never coexist.
   if (screen !== 'lesson') {
@@ -114,9 +127,20 @@ function show(screen) {
     const r = document.getElementById('freeRoot');
     if (r) r.innerHTML = '';
   }
+  if (screen !== 'library') {
+    const r = document.getElementById('libraryRoot');
+    if (r) r.innerHTML = '';
+  }
+  if (screen !== 'about') {
+    const r = document.getElementById('aboutRoot');
+    if (r) r.innerHTML = '';
+  }
   // Defensive: if user navigates while a request was hung, free the lock.
   if (prev !== screen) state.busy = false;
   if (screen === 'home') renderHome();
+  if (screen === 'library') renderLibrary();
+  if (screen === 'about') renderAbout();
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
 }
 
 // ============== Header / settings ==============
@@ -188,6 +212,12 @@ function bindHome() {
 }
 
 function renderHome() {
+  // Hero CTAs
+  const startBtn = document.getElementById('startLessonOneBtn');
+  if (startBtn) startBtn.onclick = () => openLesson('lesson-01');
+  const libBtn = document.getElementById('exploreLibraryBtn');
+  if (libBtn) libBtn.onclick = () => show('library');
+
   const root = document.getElementById('lessonList');
   if (!root) return;
   root.innerHTML = '';
@@ -370,6 +400,191 @@ function openCustomTopicEditor(editingId) {
     document.body.removeChild(overlay);
     renderCustomTopics();
   });
+}
+
+// ============== Prompt Library ==============
+let libraryActiveCategory = 'business';
+
+function renderLibrary() {
+  const root = document.getElementById('libraryRoot');
+  if (!root) return;
+  const prompts = getPromptsByCategory(libraryActiveCategory);
+
+  root.innerHTML = `
+    <div class="screen-toolbar">
+      <button class="btn ghost" id="libraryBack">← ホームに戻る</button>
+    </div>
+
+    <div class="library-pane">
+      <div class="library-header">
+        <h1>📚 プロンプトライブラリ</h1>
+        <p class="muted">プロンプトエンジニアリングのお手本集。<b>${PROMPT_LIBRARY.length} 本</b>のプロンプトを「なぜ効くか」の解説とセットで掲載。気に入ったプロンプトは <b>マイお題に保存</b> してすぐ練習できます。</p>
+      </div>
+
+      <div class="library-tabs">
+        ${PROMPT_CATEGORIES.map(c => `
+          <button class="lib-tab ${c.id === libraryActiveCategory ? 'active' : ''}"
+                  data-cat="${escape(c.id)}"
+                  style="--c:${c.accent}">
+            <span class="lib-tab-icon">${c.icon}</span>
+            <span>${escape(c.label)}</span>
+            <span class="lib-tab-count">${getPromptsByCategory(c.id).length}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="library-list">
+        ${prompts.map(p => `
+          <div class="lib-card">
+            <div class="lib-card-head">
+              <h3 class="lib-card-title">${escape(p.title)}</h3>
+              <div class="lib-card-techs">
+                ${(p.techniques || []).map(t => `<span class="tech-chip">${escape(t)}</span>`).join('')}
+              </div>
+            </div>
+            <p class="lib-card-use"><b>用途:</b> ${escape(p.useCase)}</p>
+            <details class="lib-prompt-box">
+              <summary>💡 プロンプト本文を見る</summary>
+              <pre class="lib-prompt">${escape(p.prompt)}</pre>
+              <div class="lib-card-actions">
+                <button class="btn tiny ghost" data-act="copy" data-id="${escape(p.id)}">📋 クリップボードへコピー</button>
+                <button class="btn tiny primary" data-act="save" data-id="${escape(p.id)}">＋ マイお題に保存して練習</button>
+              </div>
+            </details>
+            <div class="lib-card-why">
+              <span class="why-label">なぜ効くか</span>
+              <p>${escape(p.why)}</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('libraryBack').addEventListener('click', () => show('home'));
+  root.querySelectorAll('.lib-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      libraryActiveCategory = btn.dataset.cat;
+      renderLibrary();
+    });
+  });
+  root.querySelectorAll('[data-act=copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = PROMPT_LIBRARY.find(x => x.id === btn.dataset.id);
+      if (p && navigator.clipboard) {
+        navigator.clipboard.writeText(p.prompt)
+          .then(() => flash('クリップボードにコピーしました'))
+          .catch(() => flash('コピーに失敗しました'));
+      }
+    });
+  });
+  root.querySelectorAll('[data-act=save]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = PROMPT_LIBRARY.find(x => x.id === btn.dataset.id);
+      if (!p) return;
+      // Save as a custom topic with the prompt as a "starter" in the brief
+      const topic = saveCustomTopic({
+        title: p.title,
+        brief: `${p.useCase}\n\n--- お手本プロンプト（参考） ---\n${p.prompt}`,
+        category: p.category === 'tech' ? 'tech' :
+                  p.category === 'business' ? 'business' :
+                  p.category === 'learning' ? 'education' :
+                  p.category === 'writing' ? 'creative' : 'neutral',
+        difficulty: 'standard',
+      });
+      flash('マイお題に保存しました。練習画面に移動します…');
+      setTimeout(() => openCustomTopicPractice(topic.id), 600);
+    });
+  });
+}
+
+// ============== About page ==============
+function renderAbout() {
+  const root = document.getElementById('aboutRoot');
+  if (!root) return;
+
+  root.innerHTML = `
+    <div class="screen-toolbar">
+      <button class="btn ghost" id="aboutBack">← ホームに戻る</button>
+    </div>
+
+    <div class="about-pane">
+      <h1>📖 このアプリについて</h1>
+      <p class="about-tagline">プロンプトエンジニアリングを「読む」のではなく「書いて」身につけるための、シンプルな学習ツールです。</p>
+
+      <section class="about-section">
+        <h2>🎯 何ができるか</h2>
+        <ul>
+          <li><b>8 つのレッスン</b> で、役割の付与 → 出力構造の指定 → Few-shot → 制約 → 段階的検討 → 自己批評 までを段階的に学ぶ</li>
+          <li><b>AI が即フィードバック</b>: あなたのプロンプトを実行 → 3 軸採点 → 教師AI による講評</li>
+          <li><b>AI vs You</b>: 同じお題に AI も挑戦させて「お手本のプロンプト」を学ぶ</li>
+          <li><b>マイお題</b>: 実務課題を保存してそのまま練習に</li>
+          <li><b>プロンプトライブラリ</b>: ${PROMPT_LIBRARY.length} 本のお手本プロンプトを技法解説付きで</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h2>🧠 なぜ作ったか</h2>
+        <p>プロンプトエンジニアリングは「読んだだけでは身につかない」分野です。本やドキュメントで「役割を与えると良い」と知っても、実際に役割を与えてプロンプトを書き、出力を見て初めて感覚が掴めます。</p>
+        <p>このアプリは、その「書く → 試す → 振り返る」の最小サイクルを 1〜2 分で回せるようにしたものです。コルブの経験学習モデル（経験 → 内省 → 概念化 → 試行）に沿った設計になっています。</p>
+      </section>
+
+      <section class="about-section">
+        <h2>🔧 使ってる技術</h2>
+        <ul>
+          <li><b>フロントエンド</b>: 素の HTML / CSS / ES Modules（フレームワーク・ビルド一切なし）</li>
+          <li><b>AI バックエンド</b>: Anthropic Claude API / LM Studio・Ollama・OpenWebUI 等の OpenAI 互換サーバ / 決定論的モックの 3 系統対応</li>
+          <li><b>状態保存</b>: localStorage のみ（クラウド同期なし、データはあなたのブラウザに）</li>
+          <li><b>配信</b>: GitHub Pages からの静的配信</li>
+        </ul>
+        <p class="muted small">フレームワークを使わない理由は、教材としての可読性とロックインの少なさを優先したからです。ソースコードは GitHub に公開されているので、学習教材として読むこともできます。</p>
+      </section>
+
+      <section class="about-section">
+        <h2>📜 プロジェクト履歴</h2>
+        <p>このプロジェクトは最初「Prompt Architect TCG」というカード型対戦の体裁で始まりました。プロンプトエンジニアリングをカード（タスク / 視点 / 構造 / 特殊効果）の組み合わせとして遊ぶ仕組みです。</p>
+        <p>しかし「教育目的なら、その抽象化を挟むより、直接プロンプトを書く方が効率が良い」と気づき、レッスン形式に大きく転換しました。TCG 版のコードは git 履歴の初回コミット（<code>d02d778</code>）に残っており、いつでも参照できます。</p>
+      </section>
+
+      <section class="about-section">
+        <h2>🔐 プライバシー</h2>
+        <ul>
+          <li>あなたが書いたプロンプトと、AI の出力は <b>あなたが設定したバックエンド</b>（Anthropic / LM Studio 等）にのみ送信されます</li>
+          <li>進捗データは <b>あなたのブラウザの localStorage</b> にのみ保存。当サイトから外部に送信されるデータはありません</li>
+          <li>API キー / Bearer トークンも localStorage のみ。サーバーには保存されません</li>
+          <li>GitHub Pages の標準ログ（IP・User-Agent など）以外に追跡しません</li>
+        </ul>
+      </section>
+
+      <section class="about-section">
+        <h2>🤝 オープンソース</h2>
+        <p>MIT License で公開。Issue・PR・Fork 大歓迎です。</p>
+        <p>
+          <a href="https://github.com/nexavo409/Promptgame" target="_blank" rel="noopener">📦 nexavo409/Promptgame on GitHub ↗</a>
+        </p>
+      </section>
+
+      <section class="about-section">
+        <h2>🙏 謝辞</h2>
+        <p>本アプリのレッスン設計には、以下を参考にしています:</p>
+        <ul>
+          <li>OpenAI / Anthropic のプロンプトエンジニアリング公式ガイド</li>
+          <li>web.dev の "Learn AI: Prompt engineering" カリキュラム</li>
+          <li>コルブの経験学習モデル / ブルームの教育目標分類</li>
+          <li>Duolingo・Codecademy の段階的習得 UX</li>
+        </ul>
+      </section>
+
+      <div class="about-footer-actions">
+        <button class="btn primary" id="aboutStartBtn">▶ Lesson 1 から始める</button>
+        <button class="btn ghost" id="aboutLibraryBtn">📚 プロンプトライブラリへ</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('aboutBack').addEventListener('click', () => show('home'));
+  document.getElementById('aboutStartBtn').addEventListener('click', () => openLesson('lesson-01'));
+  document.getElementById('aboutLibraryBtn').addEventListener('click', () => show('library'));
 }
 
 function openCustomTopicPractice(id) {
