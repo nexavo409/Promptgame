@@ -11,8 +11,9 @@ import { generateOutput, judgeOutput, explainResult, improvePrompt, generateAIPr
          getOpenAIURL, setOpenAIURL, getOpenAIBearer, setOpenAIBearer } from '../ai/client.js';
 import { lineDiff, renderDiffHtml } from '../game/diff.js';
 import { renderMarkdown } from '../util/markdown.js';
-import { celebrate, isMuted, setMuted, playChime, fireConfetti, unlockAudio } from '../util/effects.js';
+import { celebrate, isMuted, setMuted } from '../util/effects.js';
 import { initTheme, getThemePref, setThemePref, nextTheme, themeLabel } from '../util/theme.js';
+import { startHeroParticles } from '../util/hero-particles.js';
 
 const state = {
   screen: 'home',         // home | lesson | free
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindFooter();
   show('home');
   initKeyboardDetection();
+  startHeroParticles();
 });
 
 function bindFooter() {
@@ -215,25 +217,6 @@ function bindHeader() {
     });
   }
 
-  // Test sound button — fires chime + small confetti so user can verify
-  // that audio works in their environment (rules out silent switch /
-  // unlock issues vs broken code).
-  const testSoundBtn = document.getElementById('testSoundBtn');
-  if (testSoundBtn) {
-    testSoundBtn.addEventListener('click', () => {
-      unlockAudio(); // ensure unlocked (this IS inside a click handler)
-      const wasMuted = isMuted();
-      if (wasMuted) setMuted(false);
-      playChime('pass');
-      fireConfetti(0.5);
-      if (wasMuted) {
-        setTimeout(() => setMuted(true), 2000);
-        flash('テスト中はミュート解除しました');
-      } else {
-        flash('音が鳴らない場合: iPhoneのサイレントスイッチをOFFに、PCはタブの音量を確認');
-      }
-    });
-  }
 
   function updateKeyStatus() {
     const backend = activeBackend();

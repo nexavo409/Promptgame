@@ -43,7 +43,6 @@
         <div class="settings-row">
           <button class="btn tiny" id="themeBtn" type="button" title="テーマを切り替え">⌚ 自動</button>
           <button class="btn tiny" id="muteBtn" type="button" title="効果音と紙吹雪をミュート">🔊 音 ON</button>
-          <button class="btn tiny" id="testSoundBtn" type="button" title="音が鳴るか確認します（iPhone はサイレントスイッチをOFFに）">🔔 テスト音</button>
         </div>
 
         <hr style="border:none; border-top:1px solid var(--line); margin:14px 0;" />
@@ -144,57 +143,15 @@
               <text x="222" y="142" text-anchor="middle" font-size="7" fill="#15803d" font-weight="700">output</text>
             </g>
 
-            <!-- Particles: SMIL animateTransform works reliably on
-                 Chrome desktop AND iOS Safari (unlike animateMotion which
-                 was the previous attempt and broke on iOS). -->
-            <g>
-              <circle r="3.2" fill="#6366f1" />
-              <animateTransform attributeName="transform" type="translate"
-                values="92,110; 116,88; 140,110" dur="2.4s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" repeatCount="indefinite" />
-            </g>
-            <g>
-              <circle r="3.2" fill="#8b5cf6" />
-              <animateTransform attributeName="transform" type="translate"
-                values="92,110; 116,110; 140,110" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" begin="0.8s" repeatCount="indefinite" />
-            </g>
-            <g>
-              <circle r="3.2" fill="#f472b6" />
-              <animateTransform attributeName="transform" type="translate"
-                values="92,110; 116,132; 140,110" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" begin="1.6s" repeatCount="indefinite" />
-            </g>
-            <g>
-              <circle r="3.2" fill="#a78bfa" />
-              <animateTransform attributeName="transform" type="translate"
-                values="140,110; 164,88; 188,110" dur="2.4s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" repeatCount="indefinite" />
-            </g>
-            <g>
-              <circle r="3.2" fill="#34d399" />
-              <animateTransform attributeName="transform" type="translate"
-                values="140,110; 164,110; 188,110" dur="2.4s" begin="1.0s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" begin="1.0s" repeatCount="indefinite" />
-            </g>
-            <g>
-              <circle r="3.2" fill="#60a5fa" />
-              <animateTransform attributeName="transform" type="translate"
-                values="140,110; 164,132; 188,110" dur="2.4s" begin="1.8s" repeatCount="indefinite" />
-              <animate attributeName="opacity"
-                values="0;1;1;0" keyTimes="0;0.15;0.85;1"
-                dur="2.4s" begin="1.8s" repeatCount="indefinite" />
-            </g>
+            <!-- Particles — positions and opacity driven by JS rAF.
+                 SMIL was inconsistent across Chrome desktop / iOS Safari;
+                 setAttribute on transform/opacity works on every browser. -->
+            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#6366f1" /></g>
+            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#8b5cf6" /></g>
+            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#f472b6" /></g>
+            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#a78bfa" /></g>
+            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#34d399" /></g>
+            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#60a5fa" /></g>
           </svg>
         </div>
       </div>
