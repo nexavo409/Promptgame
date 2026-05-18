@@ -546,52 +546,6 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   .hero-demo-text::after { animation: none; }
 }
 
-/* === Hero animations via CSS (more reliable than SMIL on iOS Safari) === */
-.hero-halo {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: hero-halo-breathe 3.6s ease-in-out infinite;
-}
-@keyframes hero-halo-breathe {
-  0%, 100% { transform: scale(0.86); opacity: 0.7; }
-  50%      { transform: scale(1.14); opacity: 1; }
-}
-
-.hero-orb-group {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: hero-orb-pulse 2.4s ease-in-out infinite;
-}
-@keyframes hero-orb-pulse {
-  0%, 100% { transform: scale(0.96); }
-  50%      { transform: scale(1.08); }
-}
-
-.hero-spark {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: hero-spark 1.8s ease-in-out infinite;
-}
-.hero-spark-1 { animation-duration: 1.8s; }
-.hero-spark-2 { animation-duration: 2.2s; animation-delay: 0.3s; }
-.hero-spark-3 { animation-duration: 1.4s; animation-delay: 0.6s; }
-@keyframes hero-spark {
-  0%, 100% { opacity: 0.4; transform: scale(0.7); }
-  50%      { opacity: 1;   transform: scale(1.2); }
-}
-
-/* Particle motion is handled by SMIL animateTransform inline in the SVG —
-   reliable on both Chrome desktop and iOS Safari. CSS animations on SVG
-   <g> elements were inconsistent across browsers. */
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-halo, .hero-orb-group, .hero-spark { animation: none !important; }
-}
-
-:root[data-theme="dark"] .hero-card-bg { fill: #1e293b; stroke: #334155; }
-:root[data-theme="dark"] .hero-text-line { fill: #475569; }
-:root[data-theme="dark"] .hero-card-tag { fill: #1e1b4b; stroke: #4338ca; }
-:root[data-theme="dark"] .hero-card-out { fill: #052e1f; stroke: #047857; }
 .hero::before {
   content: '';
   position: absolute;
