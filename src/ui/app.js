@@ -21,10 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function show(screen) {
+  const prev = state.screen;
   state.screen = screen;
   for (const s of ['home', 'lesson', 'free']) {
     document.getElementById(`screen-${s}`).classList.toggle('hidden', s !== screen);
   }
+  // Clear non-active screen roots so duplicate IDs (e.g. #promptInput) never coexist.
+  if (screen !== 'lesson') {
+    const r = document.getElementById('lessonRoot');
+    if (r) r.innerHTML = '';
+  }
+  if (screen !== 'free') {
+    const r = document.getElementById('freeRoot');
+    if (r) r.innerHTML = '';
+  }
+  // Defensive: if user navigates while a request was hung, free the lock.
+  if (prev !== screen) state.busy = false;
   if (screen === 'home') renderHome();
 }
 

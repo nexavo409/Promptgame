@@ -62,11 +62,27 @@ export function getApiKey() {
   return localStorage.getItem('pa.apiKey') || '';
 }
 
+/** Fetch with an abort timeout so a hung backend cannot freeze the UI. */
+async function fetchWithTimeout(url, opts, ms = 120000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`タイムアウト（${Math.round(ms / 1000)}秒以内に応答なし）`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(tid);
+  }
+}
+
 async function callAnthropic({ model, system, messages, max_tokens = 1024 }) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('Anthropic APIキーが設定されていません');
 
-  const res = await fetch(ANTHROPIC_URL, {
+  const res = await fetchWithTimeout(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -75,7 +91,7 @@ async function callAnthropic({ model, system, messages, max_tokens = 1024 }) {
       'anthropic-dangerous-direct-browser-access': 'true',
     },
     body: JSON.stringify({ model, max_tokens, system, messages }),
-  });
+  }, 120000);
   if (!res.ok) {
     const txt = await res.text();
     throw new Error(`Anthropic API ${res.status}: ${txt}`);
@@ -91,7 +107,8 @@ async function callLMStudio({ system, messages, max_tokens = 1024 }) {
   const endpoint = base + '/v1/chat/completions';
   const fullMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
 
-  const res = await fetch(endpoint, {
+  // LM Studio + larger local models can take a while; 3 min timeout.
+  const res = await fetchWithTimeout(endpoint, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -100,7 +117,7 @@ async function callLMStudio({ system, messages, max_tokens = 1024 }) {
       max_tokens,
       stream: false,
     }),
-  });
+  }, 180000);
   if (!res.ok) {
     const txt = await res.text();
     throw new Error(`LM Studio ${res.status}: ${txt}`);
