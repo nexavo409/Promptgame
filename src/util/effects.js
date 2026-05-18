@@ -117,15 +117,36 @@ function getAudioContext() {
 /**
  * Prime the audio context inside a user gesture. Call this from any
  * click/touch handler. iOS will then allow audio to play later.
+ *
+ * iOS Safari needs:
+ *  1. AudioContext created INSIDE a user gesture
+ *  2. resume() called
+ *  3. SOMETHING actually plays (silent oscillator is enough)
  */
 export function unlockAudio() {
   if (audioUnlocked) return;
   const ctx = getAudioContext();
   if (!ctx) return;
+
+  // Resume in case browser created it suspended
   if (ctx.state === 'suspended') {
     ctx.resume().catch(() => {});
   }
-  // Play a silent buffer to fully unlock on iOS Safari
+
+  // Play a near-silent oscillator. This is the classic iOS audio unlock —
+  // a 0-gain oscillator played for 1 ms is enough to flip iOS Safari's
+  // "audio not user-initiated" gate.
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.01);
+  } catch {}
+
+  // Also play a silent buffer source (belt-and-suspenders for older iOS)
   try {
     const buffer = ctx.createBuffer(1, 1, 22050);
     const src = ctx.createBufferSource();
@@ -133,6 +154,7 @@ export function unlockAudio() {
     src.connect(ctx.destination);
     src.start(0);
   } catch {}
+
   audioUnlocked = true;
 }
 

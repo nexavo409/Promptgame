@@ -118,8 +118,14 @@ html, body {
 }
 
 /* Hardcoded-color elements that need dark fixes */
-:root[data-theme="dark"] .md-body { color: var(--ink); }
-:root[data-theme="dark"] .md-body strong { color: #fff; }
+:root[data-theme="dark"] .md-body,
+:root[data-theme="dark"] .md-body p,
+:root[data-theme="dark"] .md-body li,
+:root[data-theme="dark"] .result-block .md-body,
+:root[data-theme="dark"] .history-row .md-body,
+:root[data-theme="dark"] .output-detail .md-body { color: #e2e8f0 !important; }
+:root[data-theme="dark"] .md-body .md-h,
+:root[data-theme="dark"] .md-body strong { color: #ffffff !important; }
 :root[data-theme="dark"] .diff-line.diff-eq { color: #94a3b8; }
 :root[data-theme="dark"] .diff-line.diff-add { background: #052e1f; color: #6ee7b7; }
 :root[data-theme="dark"] .diff-line.diff-del { background: #422006; color: #fca5a5; }
@@ -442,15 +448,79 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   .hero-illust { order: -1; }
   .hero-illust svg { max-width: 220px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .hero-illust svg animate,
-  .hero-illust svg animateMotion { display: none; }
+
+/* === Hero animations via CSS (more reliable than SMIL on iOS Safari) === */
+.hero-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hero-halo-breathe 3.6s ease-in-out infinite;
 }
-:root[data-theme="dark"] .hero-illust svg rect[fill="white"] { fill: #1e293b; stroke: #334155; }
-:root[data-theme="dark"] .hero-illust svg rect[stroke="#e2e8f0"] { stroke: #334155; }
-:root[data-theme="dark"] .hero-illust svg rect[fill="#cbd5e1"] { fill: #475569; }
-:root[data-theme="dark"] .hero-illust svg rect[fill="#eef2ff"] { fill: #1e1b4b; stroke: #4338ca; }
-:root[data-theme="dark"] .hero-illust svg rect[fill="#f0fdf4"] { fill: #052e1f; stroke: #047857; }
+@keyframes hero-halo-breathe {
+  0%, 100% { transform: scale(0.86); opacity: 0.7; }
+  50%      { transform: scale(1.14); opacity: 1; }
+}
+
+.hero-orb-group {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hero-orb-pulse 2.4s ease-in-out infinite;
+}
+@keyframes hero-orb-pulse {
+  0%, 100% { transform: scale(0.96); }
+  50%      { transform: scale(1.08); }
+}
+
+.hero-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hero-spark 1.8s ease-in-out infinite;
+}
+.hero-spark-1 { animation-duration: 1.8s; }
+.hero-spark-2 { animation-duration: 2.2s; animation-delay: 0.3s; }
+.hero-spark-3 { animation-duration: 1.4s; animation-delay: 0.6s; }
+@keyframes hero-spark {
+  0%, 100% { opacity: 0.4; transform: scale(0.7); }
+  50%      { opacity: 1;   transform: scale(1.2); }
+}
+
+/* Particles travel as a <g> group; transform-origin = SVG (0,0). */
+.hero-particle {
+  opacity: 0;
+}
+.hero-particle.pl { animation: hero-flow-left 2.4s linear infinite; }
+.hero-particle.pr { animation: hero-flow-right 2.4s linear infinite; }
+.pl-1 { animation-delay: 0s;   --arc: -22px; }
+.pl-2 { animation-delay: 0.8s; --arc: 0px;   }
+.pl-3 { animation-delay: 1.6s; --arc: 22px;  }
+.pr-1 { animation-delay: 0s;   --arc: -22px; }
+.pr-2 { animation-delay: 1.0s; --arc: 0px;   }
+.pr-3 { animation-delay: 1.8s; --arc: 22px;  }
+@keyframes hero-flow-left {
+  0%   { transform: translate(92px, 110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(116px, calc(110px + var(--arc, 0px))); }
+  85%  { opacity: 1; }
+  100% { transform: translate(140px, 110px); opacity: 0; }
+}
+@keyframes hero-flow-right {
+  0%   { transform: translate(140px, 110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(164px, calc(110px + var(--arc, 0px))); }
+  85%  { opacity: 1; }
+  100% { transform: translate(188px, 110px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-halo, .hero-orb-group, .hero-spark, .hero-particle {
+    animation: none !important;
+  }
+  .hero-particle { opacity: 0.4; }
+}
+
+:root[data-theme="dark"] .hero-card-bg { fill: #1e293b; stroke: #334155; }
+:root[data-theme="dark"] .hero-text-line { fill: #475569; }
+:root[data-theme="dark"] .hero-card-tag { fill: #1e1b4b; stroke: #4338ca; }
+:root[data-theme="dark"] .hero-card-out { fill: #052e1f; stroke: #047857; }
 .hero::before {
   content: '';
   position: absolute;

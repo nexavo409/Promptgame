@@ -105,87 +105,51 @@
             </defs>
 
             <!-- Glow halo behind orb -->
-            <circle cx="140" cy="110" r="70" fill="url(#heroGlow)">
-              <animate attributeName="r" values="60;80;60" dur="3.6s" repeatCount="indefinite" />
-            </circle>
+            <circle class="hero-halo" cx="140" cy="110" r="70" fill="url(#heroGlow)" />
 
-            <!-- LEFT: prompt input card (text lines) -->
-            <g class="hero-card-left">
-              <rect x="14" y="60" width="78" height="100" rx="10" fill="white" stroke="#e2e8f0" />
+            <!-- LEFT: prompt input card -->
+            <g>
+              <rect x="14" y="60" width="78" height="100" rx="10" fill="white" stroke="#e2e8f0" class="hero-card-bg" />
               <rect x="22" y="72" width="40" height="6" rx="3" fill="#6366f1" opacity="0.5" />
-              <rect x="22" y="86" width="62" height="4" rx="2" fill="#cbd5e1" />
-              <rect x="22" y="96" width="55" height="4" rx="2" fill="#cbd5e1" />
-              <rect x="22" y="106" width="60" height="4" rx="2" fill="#cbd5e1" />
-              <rect x="22" y="116" width="48" height="4" rx="2" fill="#cbd5e1" />
-              <rect x="22" y="130" width="44" height="14" rx="4" fill="#eef2ff" stroke="#c7d2fe" />
+              <rect x="22" y="86" width="62" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
+              <rect x="22" y="96" width="55" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
+              <rect x="22" y="106" width="60" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
+              <rect x="22" y="116" width="48" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
+              <rect x="22" y="130" width="44" height="14" rx="4" fill="#eef2ff" stroke="#c7d2fe" class="hero-card-tag" />
               <text x="44" y="140" text-anchor="middle" font-size="7" fill="#4f46e5" font-weight="700">prompt</text>
             </g>
 
             <!-- CENTER: glowing AI orb -->
-            <g>
-              <circle cx="140" cy="110" r="34" fill="url(#heroOrb)">
-                <animate attributeName="r" values="32;36;32" dur="2.4s" repeatCount="indefinite" />
-              </circle>
-              <!-- Inner sparkles -->
-              <g fill="white">
-                <circle cx="128" cy="100" r="2.4">
-                  <animate attributeName="opacity" values="1;0.3;1" dur="1.8s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="148" cy="118" r="1.8">
-                  <animate attributeName="opacity" values="0.4;1;0.4" dur="2.2s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="140" cy="96" r="1.4">
-                  <animate attributeName="opacity" values="0.6;1;0.6" dur="1.4s" repeatCount="indefinite" />
-                </circle>
-              </g>
+            <g class="hero-orb-group">
+              <circle cx="140" cy="110" r="34" fill="url(#heroOrb)" />
+              <circle class="hero-spark hero-spark-1" cx="128" cy="100" r="2.4" fill="white" />
+              <circle class="hero-spark hero-spark-2" cx="148" cy="118" r="1.8" fill="white" />
+              <circle class="hero-spark hero-spark-3" cx="140" cy="96" r="1.4" fill="white" />
               <text x="140" y="115" text-anchor="middle" font-size="10" fill="white" font-weight="700">AI</text>
             </g>
 
-            <!-- RIGHT: output card (structured) -->
-            <g class="hero-card-right">
-              <rect x="188" y="60" width="78" height="100" rx="10" fill="white" stroke="#e2e8f0" />
+            <!-- RIGHT: output card -->
+            <g>
+              <rect x="188" y="60" width="78" height="100" rx="10" fill="white" stroke="#e2e8f0" class="hero-card-bg" />
               <rect x="196" y="72" width="48" height="6" rx="3" fill="#8b5cf6" opacity="0.6" />
-              <rect x="196" y="86" width="58" height="4" rx="2" fill="#cbd5e1" />
+              <rect x="196" y="86" width="58" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
               <circle cx="199" cy="100" r="1.5" fill="#8b5cf6" />
-              <rect x="206" y="98" width="44" height="4" rx="2" fill="#cbd5e1" />
+              <rect x="206" y="98" width="44" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
               <circle cx="199" cy="110" r="1.5" fill="#8b5cf6" />
-              <rect x="206" y="108" width="50" height="4" rx="2" fill="#cbd5e1" />
+              <rect x="206" y="108" width="50" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
               <circle cx="199" cy="120" r="1.5" fill="#8b5cf6" />
-              <rect x="206" y="118" width="40" height="4" rx="2" fill="#cbd5e1" />
-              <rect x="196" y="132" width="52" height="14" rx="4" fill="#f0fdf4" stroke="#86efac" />
+              <rect x="206" y="118" width="40" height="4" rx="2" fill="#cbd5e1" class="hero-text-line" />
+              <rect x="196" y="132" width="52" height="14" rx="4" fill="#f0fdf4" stroke="#86efac" class="hero-card-out" />
               <text x="222" y="142" text-anchor="middle" font-size="7" fill="#15803d" font-weight="700">output</text>
             </g>
 
-            <!-- Flowing particles: left card → orb → right card -->
-            <g class="hero-particles">
-              <!-- LEFT → ORB (3 particles, arc up) -->
-              <circle r="3" fill="#6366f1">
-                <animateMotion dur="2.4s" repeatCount="indefinite" path="M92,110 Q116,86 140,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" repeatCount="indefinite" />
-              </circle>
-              <circle r="3" fill="#8b5cf6">
-                <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite" path="M92,110 Q116,110 140,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
-              </circle>
-              <circle r="3" fill="#f472b6">
-                <animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite" path="M92,110 Q116,134 140,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
-              </circle>
-
-              <!-- ORB → RIGHT (3 particles, arc up) -->
-              <circle r="3" fill="#a78bfa">
-                <animateMotion dur="2.4s" repeatCount="indefinite" path="M140,110 Q164,86 188,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" repeatCount="indefinite" />
-              </circle>
-              <circle r="3" fill="#34d399">
-                <animateMotion dur="2.4s" begin="1.0s" repeatCount="indefinite" path="M140,110 Q164,110 188,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.0s" repeatCount="indefinite" />
-              </circle>
-              <circle r="3" fill="#60a5fa">
-                <animateMotion dur="2.4s" begin="1.8s" repeatCount="indefinite" path="M140,110 Q164,134 188,110" />
-                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.8s" repeatCount="indefinite" />
-              </circle>
-            </g>
+            <!-- Particles: each wrapped in a <g> so CSS transform animates reliably across iOS / Android -->
+            <g class="hero-particle pl pl-1"><circle r="3.2" fill="#6366f1" /></g>
+            <g class="hero-particle pl pl-2"><circle r="3.2" fill="#8b5cf6" /></g>
+            <g class="hero-particle pl pl-3"><circle r="3.2" fill="#f472b6" /></g>
+            <g class="hero-particle pr pr-1"><circle r="3.2" fill="#a78bfa" /></g>
+            <g class="hero-particle pr pr-2"><circle r="3.2" fill="#34d399" /></g>
+            <g class="hero-particle pr pr-3"><circle r="3.2" fill="#60a5fa" /></g>
           </svg>
         </div>
       </div>
