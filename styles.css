@@ -25,8 +25,28 @@ html, body {
      Pinch-to-zoom still works (manipulation only blocks non-standard gestures). */
   touch-action: manipulation;
   -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
-* { touch-action: manipulation; }
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Make tap targets that should NEVER zoom on double-tap fully immune.
+   Apply -webkit-user-select: none so iOS doesn't fall back to "select text"
+   interpretation which can trigger a zoom heuristic. */
+button, summary, .btn, .lesson-row, .history-row, .history-head,
+.preset, .card, .badge, label, .lesson-num, .recipe-step-row,
+.compare-check, .skill-btn {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* But keep text selection on body content where copying matters. */
+textarea, input, .md-body, pre, .prompt-preview-body, .output-detail,
+.history-row pre, .diff-body {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 main {
   max-width: 980px;
@@ -654,6 +674,15 @@ h3 { font-size: 16px; margin: 0 0 8px; }
   }
   .editor-actions .btn.big { padding: 14px 20px; font-size: 16px; width: 100%; }
   .editor-actions #charCount { display: none; }
+
+  /* While the on-screen keyboard is up, the sticky button covers the
+     line being typed. Slide it off-screen; user presses iOS keyboard's
+     "完了" (Done) to dismiss the keyboard, then taps 試す. */
+  html.kb-open .editor-actions {
+    transform: translateY(110%);
+    transition: transform 0.18s ease;
+    pointer-events: none;
+  }
 
   /* Markdown text bumps slightly for mobile reading */
   .md-body { font-size: 15px; }

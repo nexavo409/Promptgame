@@ -59,7 +59,42 @@ document.addEventListener('DOMContentLoaded', () => {
   bindHeader();
   bindHome();
   show('home');
+  initKeyboardDetection();
 });
+
+/**
+ * Detect iOS / Android on-screen keyboard via visualViewport.
+ * When it's open, toggle html.kb-open so CSS can hide the sticky 試す
+ * button (which otherwise covers the line being typed).
+ */
+function initKeyboardDetection() {
+  if (!window.visualViewport) return;
+  const check = () => {
+    const diff = window.innerHeight - window.visualViewport.height;
+    const kbOpen = diff > 120; // keyboard occupies > ~120px of viewport
+    document.documentElement.classList.toggle('kb-open', kbOpen);
+  };
+  window.visualViewport.addEventListener('resize', check);
+  window.visualViewport.addEventListener('scroll', check);
+  check();
+
+  // iOS Safari sometimes ignores CSS touch-action on text-heavy elements
+  // (summary, list rows). Belt-and-suspenders: cancel the default action
+  // of the SECOND tap if it lands within 320 ms of the first. This kills
+  // double-tap zoom without harming single taps or pinch zoom.
+  let lastTouch = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouch <= 320) {
+      // But don't block typing into form fields
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+      }
+    }
+    lastTouch = now;
+  }, { passive: false });
+}
 
 function show(screen) {
   const prev = state.screen;
