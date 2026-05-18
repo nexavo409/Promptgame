@@ -477,13 +477,6 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
 .hero-demo {
   position: relative;
 }
-.hero-demo-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  margin-bottom: 6px;
-  letter-spacing: 0.04em;
-}
 .hero-demo-box {
   background: #0f172a;
   color: #f1f5f9;
@@ -536,26 +529,6 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   to { visibility: hidden; }
 }
 .hero-demo-cursor { display: none; }
-.hero-demo-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--muted);
-}
-.hero-demo-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-  animation: hero-dot-pulse 1.6s ease-in-out infinite;
-}
-@keyframes hero-dot-pulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.2); }
-}
 
 @media (max-width: 760px) {
   .hero { padding: 24px 22px; grid-template-columns: 1fr; gap: 18px; }
@@ -564,7 +537,6 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-demo-text::after { animation: none; }
-  .hero-demo-dot         { animation: none; }
 }
 
 /* === Hero animations via CSS (more reliable than SMIL on iOS Safari) === */

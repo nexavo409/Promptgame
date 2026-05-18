@@ -1,5 +1,7 @@
-// Hero typewriter — loops through sample prompts, typing them char by char.
-// Pure JS setInterval, no SMIL/CSS-animation quirks.
+// Hero typewriter — loops through sample prompts.
+// Minimal implementation: just setTimeout + textContent. No reduced-motion
+// guard (the typing is slow and gentle) and no visibility handler
+// (an earlier version had one that could stall on some browsers).
 
 const PROMPTS = [
   `あなたは新人エンジニアの教育担当です。
@@ -26,33 +28,9 @@ export function startHeroTyper() {
   const el = document.querySelector('.hero-demo-text');
   if (!el) return;
 
-  // Respect reduced motion: just show the first prompt statically.
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    el.textContent = PROMPTS[0];
-    return;
-  }
-
-  let i = 0;          // current prompt index
-  let j = 0;          // chars typed so far
-  let phase = 'type'; // 'type' | 'hold' | 'erase' | 'gap'
-  let timer = null;
-  let running = true;
-
-  // Pause when the tab is hidden (saves CPU + lets text restart fresh)
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      running = false;
-      if (timer) { clearTimeout(timer); timer = null; }
-    } else if (!running) {
-      running = true;
-      tick();
-    }
-  });
-
-  function schedule(ms) {
-    if (!running) return;
-    timer = setTimeout(tick, ms);
-  }
+  let i = 0;
+  let j = 0;
+  let phase = 'type';
 
   function tick() {
     const current = PROMPTS[i];
@@ -60,28 +38,31 @@ export function startHeroTyper() {
       case 'type':
         j++;
         el.textContent = current.slice(0, j);
-        if (j >= current.length) { phase = 'hold'; schedule(HOLD_MS); }
-        else                      { schedule(TYPE_MS + Math.random() * TYPE_JIT); }
+        if (j >= current.length) {
+          phase = 'hold';
+          setTimeout(tick, HOLD_MS);
+        } else {
+          setTimeout(tick, TYPE_MS + Math.random() * TYPE_JIT);
+        }
         break;
       case 'hold':
         phase = 'erase';
-        schedule(ERASE_MS);
+        setTimeout(tick, ERASE_MS);
         break;
       case 'erase':
         j--;
         el.textContent = current.slice(0, j);
-        if (j <= 0) { phase = 'gap'; schedule(NEXT_MS); }
-        else        { schedule(ERASE_MS); }
-        break;
-      case 'gap':
-        i = (i + 1) % PROMPTS.length;
-        phase = 'type';
-        schedule(TYPE_MS);
+        if (j <= 0) {
+          i = (i + 1) % PROMPTS.length;
+          phase = 'type';
+          setTimeout(tick, NEXT_MS);
+        } else {
+          setTimeout(tick, ERASE_MS);
+        }
         break;
     }
   }
 
-  // Start fresh
   el.textContent = '';
-  schedule(NEXT_MS);
+  setTimeout(tick, 300);
 }
