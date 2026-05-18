@@ -8,6 +8,7 @@ import { generateOutput, judgeOutput, explainResult, improvePrompt,
          hasAIBackend, activeBackend,
          getOpenAIURL, setOpenAIURL, getOpenAIBearer, setOpenAIBearer } from '../ai/client.js';
 import { lineDiff, renderDiffHtml } from '../game/diff.js';
+import { renderMarkdown } from '../util/markdown.js';
 
 const state = {
   screen: 'home',         // home | lesson | free
@@ -23,6 +24,34 @@ function draftSlot() {
   if (state.screen === 'lesson' && state.currentLesson) return 'lesson.' + state.currentLesson.id;
   if (state.screen === 'free') return 'free';
   return null;
+}
+
+// On iOS, when the textarea is focused the on-screen keyboard covers half the
+// viewport. Auto-scroll the textarea above the keyboard so the user can see
+// what they're typing.
+function attachMobileKeyboardScroll(ta) {
+  if (!ta) return;
+  ta.addEventListener('focus', () => {
+    setTimeout(() => {
+      try { ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+    }, 350); // wait for keyboard slide-in animation
+  });
+  if (window.visualViewport) {
+    const onResize = () => {
+      if (document.activeElement === ta) {
+        try { ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {}
+      }
+    };
+    window.visualViewport.addEventListener('resize', onResize);
+    // Clean up the listener once the textarea is gone from the DOM
+    const observer = new MutationObserver(() => {
+      if (!document.body.contains(ta)) {
+        window.visualViewport.removeEventListener('resize', onResize);
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 }
 
 // ============== Boot ==============
@@ -268,6 +297,7 @@ function renderLesson() {
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
     saveDraft(draftSlot(), ta.value);
   });
+  attachMobileKeyboardScroll(ta);
   document.getElementById('tryBtn').addEventListener('click', onTry);
   const copyBtn = document.getElementById('copyExampleBtn');
   if (copyBtn) copyBtn.addEventListener('click', (e) => {
@@ -335,7 +365,7 @@ function renderHistory(history) {
       </details>
       <details>
         <summary>AIの出力</summary>
-        <pre>${escape(h.output)}</pre>
+        <div class="md-body">${renderMarkdown(h.output)}</div>
       </details>
     `;
     list.appendChild(row);
@@ -452,7 +482,7 @@ function renderResult(attempt) {
       </div>
       <details class="output-detail" open>
         <summary>🤖 AIの出力</summary>
-        <pre>${escape(output)}</pre>
+        <div class="md-body">${renderMarkdown(output)}</div>
       </details>
       <details class="judge-detail">
         <summary>判定の根拠</summary>
@@ -609,6 +639,7 @@ function renderFree() {
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
     saveDraft(draftSlot(), ta.value);
   });
+  attachMobileKeyboardScroll(ta);
   document.getElementById('tryBtn').addEventListener('click', onTryFree);
 
   if (state.attempt) renderResult(state.attempt);
