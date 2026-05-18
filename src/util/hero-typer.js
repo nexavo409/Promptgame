@@ -3,10 +3,12 @@
 // guard (the typing is slow and gentle) and no visibility handler
 // (an earlier version had one that could stall on some browsers).
 
+// Only put '\n' where a line break is intentional (paragraph or list).
+// CSS `white-space: pre-wrap` preserves these AND auto-wraps prose to
+// fit any viewport width, so we don't hardcode mid-sentence breaks.
 const PROMPTS = [
   `あなたは新人エンジニアの教育担当です。
-React の状態管理 (useState / useReducer / Context) の
-使い分けを初心者にもわかるように説明してください。`,
+React の状態管理 (useState / useReducer / Context) の使い分けを初心者にもわかるように説明してください。`,
   `AI とは何かを小学生にもわかるように説明してください。
 制約:
 - 200 字以内

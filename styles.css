@@ -509,8 +509,15 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   display: block;
   margin: 18px 0 0;
   padding: 0;
+  /* pre-wrap preserves '\n' from JS and wraps prose at the right edge.
+     overflow-wrap: anywhere lets Japanese wrap at any char (避ける mid-word
+     breaks aren't an issue for CJK).
+     word-break: normal avoids the "break inside a Latin word" behaviour
+     that 'break-all' / 'break-word' force. */
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-break: strict;
   color: #e2e8f0;
   font-family: inherit;
   font-size: inherit;
