@@ -117,15 +117,36 @@ html, body {
   color: #64748b;
 }
 
-/* Hardcoded-color elements that need dark fixes */
+/* Dark-mode markdown body: force EVERY descendant to a readable color.
+   The wildcard handles arbitrary nesting from the LLM output, then
+   specific elements (code, headings, strong) get their own bright tone. */
 :root[data-theme="dark"] .md-body,
-:root[data-theme="dark"] .md-body p,
-:root[data-theme="dark"] .md-body li,
-:root[data-theme="dark"] .result-block .md-body,
-:root[data-theme="dark"] .history-row .md-body,
-:root[data-theme="dark"] .output-detail .md-body { color: #e2e8f0 !important; }
+:root[data-theme="dark"] .md-body *:not(code):not(pre):not(.md-inline-code):not(.md-code) {
+  color: #e2e8f0 !important;
+}
 :root[data-theme="dark"] .md-body .md-h,
-:root[data-theme="dark"] .md-body strong { color: #ffffff !important; }
+:root[data-theme="dark"] .md-body strong,
+:root[data-theme="dark"] .md-body b {
+  color: #ffffff !important;
+}
+:root[data-theme="dark"] .md-body em,
+:root[data-theme="dark"] .md-body i {
+  color: #fde68a !important;
+}
+:root[data-theme="dark"] .md-body .md-inline-code {
+  color: #f9a8d4 !important;
+  background: #1e293b !important;
+}
+:root[data-theme="dark"] .md-body .md-code,
+:root[data-theme="dark"] .md-body .md-code code {
+  color: #e2e8f0 !important;
+  background: #050811 !important;
+}
+:root[data-theme="dark"] .md-body .md-quote {
+  color: #c4b5fd !important;
+  background: #1e1b4b !important;
+  border-left-color: #818cf8 !important;
+}
 :root[data-theme="dark"] .diff-line.diff-eq { color: #94a3b8; }
 :root[data-theme="dark"] .diff-line.diff-add { background: #052e1f; color: #6ee7b7; }
 :root[data-theme="dark"] .diff-line.diff-del { background: #422006; color: #fca5a5; }
@@ -158,7 +179,21 @@ html, body {
 :root[data-theme="dark"] .recipe-side { background: var(--panel-soft); border-color: var(--line); }
 :root[data-theme="dark"] .recipe-step-pill { color: #fff; }
 :root[data-theme="dark"] .output-detail pre, :root[data-theme="dark"] .judge-detail pre,
-:root[data-theme="dark"] .history-row pre, :root[data-theme="dark"] .prompt-preview-body { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .history-row pre, :root[data-theme="dark"] .prompt-preview-body {
+  background: #0b1120 !important;
+  color: #e2e8f0 !important;
+  border-color: var(--line) !important;
+}
+:root[data-theme="dark"] .history-panel,
+:root[data-theme="dark"] .history-panel summary,
+:root[data-theme="dark"] .history-row,
+:root[data-theme="dark"] .history-row details summary,
+:root[data-theme="dark"] .history-head { color: var(--ink); }
+:root[data-theme="dark"] .history-panel { background: var(--panel-soft); border-color: var(--line); }
+:root[data-theme="dark"] .history-row { border-top-color: var(--line); }
+:root[data-theme="dark"] .history-row .badge.passed { background: #052e1f; color: #6ee7b7; }
+:root[data-theme="dark"] .history-compare-bar { background: var(--panel); border-color: var(--line); color: var(--ink); }
+:root[data-theme="dark"] .history-num { background: #475569; color: #fff; }
 :root[data-theme="dark"] .lib-prompt { background: #050811; }
 :root[data-theme="dark"] .footer-bottom { color: #475569 !important; }
 :root[data-theme="dark"] .lesson-explainer p,
@@ -483,29 +518,56 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   50%      { opacity: 1;   transform: scale(1.2); }
 }
 
-/* Particles travel as a <g> group; transform-origin = SVG (0,0). */
-.hero-particle {
-  opacity: 0;
-}
-.hero-particle.pl { animation: hero-flow-left 2.4s linear infinite; }
-.hero-particle.pr { animation: hero-flow-right 2.4s linear infinite; }
-.pl-1 { animation-delay: 0s;   --arc: -22px; }
-.pl-2 { animation-delay: 0.8s; --arc: 0px;   }
-.pl-3 { animation-delay: 1.6s; --arc: 22px;  }
-.pr-1 { animation-delay: 0s;   --arc: -22px; }
-.pr-2 { animation-delay: 1.0s; --arc: 0px;   }
-.pr-3 { animation-delay: 1.8s; --arc: 22px;  }
-@keyframes hero-flow-left {
-  0%   { transform: translate(92px, 110px); opacity: 0; }
+/* Particles. 6 explicit keyframes (no CSS vars in calc — Chrome desktop
+   was dropping the animation entirely when var() lived inside translate's
+   calc()). Each particle gets its own named animation. */
+.hero-particle { opacity: 0; }
+.pl-1 { animation: hero-pl-up   2.4s linear infinite; }
+.pl-2 { animation: hero-pl-mid  2.4s linear 0.8s infinite; }
+.pl-3 { animation: hero-pl-down 2.4s linear 1.6s infinite; }
+.pr-1 { animation: hero-pr-up   2.4s linear infinite; }
+.pr-2 { animation: hero-pr-mid  2.4s linear 1.0s infinite; }
+.pr-3 { animation: hero-pr-down 2.4s linear 1.8s infinite; }
+
+@keyframes hero-pl-up {
+  0%   { transform: translate(92px,  110px); opacity: 0; }
   15%  { opacity: 1; }
-  50%  { transform: translate(116px, calc(110px + var(--arc, 0px))); }
+  50%  { transform: translate(116px, 88px);  }
   85%  { opacity: 1; }
   100% { transform: translate(140px, 110px); opacity: 0; }
 }
-@keyframes hero-flow-right {
+@keyframes hero-pl-mid {
+  0%   { transform: translate(92px,  110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(116px, 110px); }
+  85%  { opacity: 1; }
+  100% { transform: translate(140px, 110px); opacity: 0; }
+}
+@keyframes hero-pl-down {
+  0%   { transform: translate(92px,  110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(116px, 132px); }
+  85%  { opacity: 1; }
+  100% { transform: translate(140px, 110px); opacity: 0; }
+}
+@keyframes hero-pr-up {
   0%   { transform: translate(140px, 110px); opacity: 0; }
   15%  { opacity: 1; }
-  50%  { transform: translate(164px, calc(110px + var(--arc, 0px))); }
+  50%  { transform: translate(164px, 88px);  }
+  85%  { opacity: 1; }
+  100% { transform: translate(188px, 110px); opacity: 0; }
+}
+@keyframes hero-pr-mid {
+  0%   { transform: translate(140px, 110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(164px, 110px); }
+  85%  { opacity: 1; }
+  100% { transform: translate(188px, 110px); opacity: 0; }
+}
+@keyframes hero-pr-down {
+  0%   { transform: translate(140px, 110px); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(164px, 132px); }
   85%  { opacity: 1; }
   100% { transform: translate(188px, 110px); opacity: 0; }
 }
@@ -784,22 +846,35 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
 }
 
 /* AI improve button */
-.improve-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  flex-wrap: wrap;
+.improve-btn-big {
+  display: block;
+  width: 100%;
+  margin: 10px 0 14px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: transform var(--trans), box-shadow var(--trans);
 }
-.improve-line > b { flex-shrink: 0; }
-.improve-btn {
-  margin-left: auto;
-  white-space: nowrap;
-  background: #fff;
-  border-color: #16a34a !important;
-  color: #166534 !important;
+.improve-btn-big:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
 }
-.improve-btn:hover { background: #dcfce7 !important; }
-.improve-btn:disabled { opacity: 0.5; }
+.improve-btn-big:active { transform: translateY(0) scale(0.98); }
+.improve-btn-big:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #94a3b8;
+  box-shadow: none;
+  transform: none;
+}
+:root[data-theme="dark"] .improve-btn-big { box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45); }
 
 /* History compare + diff viewer */
 .history-compare-bar {
