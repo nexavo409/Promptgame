@@ -14,6 +14,7 @@ const state = {
   currentTopic: null,     // for free mode
   attempt: null,          // { prompt, output, judge, explanation, passed } | null
   compare: new Set(),     // history indices selected for diff compare
+  draftSource: 'user',    // 'user' | 'ai-improved' | 'sample' — origin tag for the current draft
   busy: false,
 };
 
@@ -177,6 +178,7 @@ function openLesson(lessonId) {
   state.currentTopic = lesson.topic;
   state.attempt = null;
   state.compare = new Set();
+  state.draftSource = 'user';
   show('lesson');
   renderLesson();
 }
@@ -263,6 +265,7 @@ function renderLesson() {
     ta.value = lesson.examplePrompt;
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
     saveDraft(draftSlot(), ta.value);
+    state.draftSource = 'sample';
     ta.focus();
   });
 
@@ -299,6 +302,11 @@ function renderHistory(history) {
     row.className = 'history-row';
     const checked = state.compare.has(i) ? 'checked' : '';
     const disabled = !state.compare.has(i) && state.compare.size >= 2 ? 'disabled' : '';
+    const sourceBadge = h.source === 'ai-improved'
+      ? '<span class="badge source-ai" title="教師の提案でAIに書き直してもらった版">💡 AI改善版</span>'
+      : h.source === 'sample'
+      ? '<span class="badge source-sample" title="サンプルプロンプトをそのまま使った版">📝 サンプル使用</span>'
+      : '';
     row.innerHTML = `
       <div class="history-head">
         <label class="compare-check" title="比較対象に含める">
@@ -307,6 +315,7 @@ function renderHistory(history) {
         <span class="history-num">#${history.length - i}</span>
         <span class="history-score">${total.toFixed(1)} 点</span>
         <span class="history-axes muted small">正${h.judge.accuracy} / 役${h.judge.utility} / 新${h.judge.novelty}</span>
+        ${sourceBadge}
         ${h.passed ? '<span class="badge passed">通過</span>' : ''}
         <span class="history-time muted small">${formatTime(h.ts)}</span>
       </div>
@@ -391,10 +400,12 @@ async function onTry() {
     const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
     const passed = checkPass(judge, lesson.passCondition);
-    const attempt = { prompt, output, judge, explanation, passed };
+    const source = state.draftSource;
+    const attempt = { prompt, output, judge, explanation, passed, source };
     state.attempt = attempt;
     recordAttempt(lesson.id, attempt);
     clearDraft(draftSlot());
+    state.draftSource = 'user';
 
     // Re-render the lesson (so history updates), then surface the result
     renderLesson();
@@ -488,6 +499,7 @@ async function onAIImprove(attempt) {
       ta.value = improved;
       ta.focus();
       saveDraft(draftSlot(), ta.value);
+      state.draftSource = 'ai-improved';
       const cc = document.getElementById('charCount');
       if (cc) cc.textContent = `${ta.value.length} 字`;
       ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -512,6 +524,7 @@ function openFreePractice() {
   state.currentTopic = randomFreeTopic();
   state.attempt = null;
   state.compare = new Set();
+  state.draftSource = 'user';
   show('free');
   renderFree();
 }
@@ -575,6 +588,7 @@ function renderFree() {
     state.currentTopic = randomFreeTopic();
     state.attempt = null;
     state.compare = new Set();
+    state.draftSource = 'user';
     renderFree();
   });
   const ta = document.getElementById('promptInput');
@@ -610,11 +624,13 @@ async function onTryFree() {
     setResolvingStatus('教師が解説中…');
     const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
-    const attempt = { prompt, output, judge, explanation, passed: false };
+    const source = state.draftSource;
+    const attempt = { prompt, output, judge, explanation, passed: false, source };
     state.attempt = attempt;
     const slot = freeSlotId();
     if (slot) recordAttempt(slot, attempt);
     clearDraft(draftSlot());
+    state.draftSource = 'user';
     renderFree();
   } catch (e) {
     console.error(e);
