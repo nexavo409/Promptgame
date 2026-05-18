@@ -466,22 +466,10 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   margin-top: 12px;
   box-shadow: var(--shadow-md);
   overflow: hidden;
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 28px;
-  align-items: center;
 }
 .hero-text { min-width: 0; }
-.hero-illust {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.hero-illust svg { width: 100%; max-width: 320px; height: auto; }
 @media (max-width: 760px) {
-  .hero { grid-template-columns: 1fr; padding: 24px 22px; }
-  .hero-illust { order: -1; }
-  .hero-illust svg { max-width: 220px; }
+  .hero { padding: 24px 22px; }
 }
 
 /* === Hero animations via CSS (more reliable than SMIL on iOS Safari) === */

@@ -11,7 +11,6 @@ import { generateOutput, judgeOutput, explainResult, improvePrompt, generateAIPr
          getOpenAIURL, setOpenAIURL, getOpenAIBearer, setOpenAIBearer } from '../ai/client.js';
 import { lineDiff, renderDiffHtml } from '../game/diff.js';
 import { renderMarkdown } from '../util/markdown.js';
-import { celebrate, isMuted, setMuted } from '../util/effects.js';
 import { initTheme, getThemePref, setThemePref, nextTheme, themeLabel } from '../util/theme.js';
 
 const state = {
@@ -202,18 +201,6 @@ function bindHeader() {
     });
   }
 
-  // Mute toggle for chime/confetti
-  const muteBtn = document.getElementById('muteBtn');
-  if (muteBtn) {
-    const refreshMute = () => {
-      muteBtn.textContent = isMuted() ? '🔇 音 OFF' : '🔊 音 ON';
-    };
-    refreshMute();
-    muteBtn.addEventListener('click', () => {
-      setMuted(!isMuted());
-      refreshMute();
-    });
-  }
 
 
   function updateKeyStatus() {
@@ -867,15 +854,9 @@ async function onTry() {
     const attempt = { prompt, output, judge, explanation, passed, source };
     state.attempt = attempt;
     state.vsAttempt = null;
-    const prevBest = loadLessonProgress(lesson.id).bestScore?.total ?? 0;
     recordAttempt(lesson.id, attempt);
     clearDraft(draftSlot());
     state.draftSource = 'user';
-    // Celebrate! Bigger party for personal-best total.
-    if (passed) {
-      const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
-      celebrate({ personalBest: total > prevBest + 0.01 });
-    }
 
     // Re-render the lesson (so history updates), then surface the result
     renderLesson();
