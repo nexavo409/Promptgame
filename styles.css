@@ -44,6 +44,73 @@
   --trans: 0.18s var(--ease);
 }
 
+/* Dark theme — applied via html[data-theme="dark"] (set by theme.js) */
+:root[data-theme="dark"] {
+  --bg: #0b1120;
+  --bg-soft: #111827;
+  --panel: #1e293b;
+  --panel-soft: #243049;
+  --ink: #f1f5f9;
+  --ink-soft: #cbd5e1;
+  --muted: #94a3b8;
+  --line: #334155;
+  --line-soft: #475569;
+
+  --accent: #818cf8;
+  --accent-2: #a78bfa;
+  --accent-dim: #1e1b4b;
+  --coral: #fb7185;
+  --coral-dim: #4c1d3a;
+  --teal: #2dd4bf;
+
+  --grad-brand: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  --grad-brand-soft: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4),
+               0 8px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 4px 10px rgba(0, 0, 0, 0.4),
+               0 16px 40px rgba(0, 0, 0, 0.45);
+  --shadow-brand: 0 4px 16px rgba(139, 92, 246, 0.4);
+}
+:root[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 10% 0%, rgba(139, 92, 246, 0.14), transparent 50%),
+    radial-gradient(circle at 90% 100%, rgba(244, 114, 182, 0.08), transparent 50%);
+}
+/* Adjustments specific to dark mode (where color-on-color contrast needs tuning) */
+:root[data-theme="dark"] .lib-prompt,
+:root[data-theme="dark"] .md-body .md-code { background: #050811; }
+:root[data-theme="dark"] .md-body .md-inline-code { background: #1e293b; color: #f0abfc; }
+:root[data-theme="dark"] .topic-card { background: linear-gradient(135deg, #1e1b4b 0%, #1e293b 100%); border-color: #4338ca; }
+:root[data-theme="dark"] .teacher-panel { background: linear-gradient(180deg, #052e1f 0%, #064e3b 100%); border-color: #047857; }
+:root[data-theme="dark"] .teacher-panel p, :root[data-theme="dark"] .teacher-head { color: #6ee7b7; }
+:root[data-theme="dark"] .vs-panel { background: linear-gradient(180deg, #422006 0%, #1e293b 70%); border-color: #b45309; }
+:root[data-theme="dark"] .vs-head h4, :root[data-theme="dark"] .vs-verdict { color: #fcd34d; }
+:root[data-theme="dark"] .vs-verdict { background: #422006; border-color: #b45309; }
+:root[data-theme="dark"] .vs-summary { background: var(--panel); }
+:root[data-theme="dark"] .lesson-row.passed { background: linear-gradient(135deg, #1e293b 0%, #052e1f 100%); border-color: #065f46; }
+:root[data-theme="dark"] .lesson-row.free, :root[data-theme="dark"] .lesson-row.custom { background: linear-gradient(135deg, #1e293b 0%, #422006 100%); border-color: #b45309; }
+:root[data-theme="dark"] .skills-bar { background: linear-gradient(90deg, #422006 0%, #78350f 100%); border-color: #b45309; }
+:root[data-theme="dark"] .skill-btn { background: var(--panel); color: #fcd34d; }
+:root[data-theme="dark"] .hint-line { background: #422006; color: #fcd34d; border-color: #b45309; }
+:root[data-theme="dark"] .quickhelp, :root[data-theme="dark"] .lesson-explainer { background: #1e1b4b; border-color: #4338ca; }
+:root[data-theme="dark"] .quickhelp summary, :root[data-theme="dark"] .lesson-explainer summary { color: #c4b5fd; }
+:root[data-theme="dark"] .lesson-num { background: var(--grad-brand-soft); border-color: #4c1d95; color: #c4b5fd; }
+:root[data-theme="dark"] .value-icon { background: var(--grad-brand-soft); border-color: #4c1d95; }
+:root[data-theme="dark"] .prompt-editor textarea { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .settings-popover input { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .modal input, :root[data-theme="dark"] .modal textarea, :root[data-theme="dark"] .modal select { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .recipe-step-row { background: var(--panel); }
+:root[data-theme="dark"] .result-block.passed { background: linear-gradient(180deg, #052e1f 0%, #1e293b 60%); border-color: #047857; }
+:root[data-theme="dark"] .result-block.not-passed { background: linear-gradient(180deg, #422006 0%, #1e293b 60%); border-color: #b45309; }
+:root[data-theme="dark"] .result-block.free { background: linear-gradient(180deg, #1e1b4b 0%, #1e293b 60%); border-color: #4338ca; }
+:root[data-theme="dark"] .result-score { background: var(--grad-brand-soft); }
+
+html, body {
+  transition: background-color 0.3s var(--ease), color 0.3s var(--ease);
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -109,6 +176,19 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .hidden { display: none !important; }
+
+/* Screen entry transition — fade + slight rise */
+.screen { animation: screen-enter 0.32s var(--ease); }
+@keyframes screen-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen, .modal, .modal-overlay, .lesson-row, .btn, .brand-mark {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 
 /* Header */
 .app-header {
@@ -214,6 +294,13 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   padding-top: 10px;
   border-top: 1px solid var(--line);
 }
+.settings-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.settings-row .btn { flex: 1; min-width: 110px; }
 
 /* Buttons */
 .btn {
@@ -276,7 +363,32 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
   margin-top: 12px;
   box-shadow: var(--shadow-md);
   overflow: hidden;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 28px;
+  align-items: center;
 }
+.hero-text { min-width: 0; }
+.hero-illust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-illust svg { width: 100%; max-width: 320px; height: auto; }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; padding: 24px 22px; }
+  .hero-illust { order: -1; }
+  .hero-illust svg { max-width: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-illust svg animate,
+  .hero-illust svg animateMotion { display: none; }
+}
+:root[data-theme="dark"] .hero-illust svg rect[fill="white"] { fill: #1e293b; stroke: #334155; }
+:root[data-theme="dark"] .hero-illust svg rect[stroke="#e2e8f0"] { stroke: #334155; }
+:root[data-theme="dark"] .hero-illust svg rect[fill="#cbd5e1"] { fill: #475569; }
+:root[data-theme="dark"] .hero-illust svg rect[fill="#eef2ff"] { fill: #1e1b4b; stroke: #4338ca; }
+:root[data-theme="dark"] .hero-illust svg rect[fill="#f0fdf4"] { fill: #052e1f; stroke: #047857; }
 .hero::before {
   content: '';
   position: absolute;
