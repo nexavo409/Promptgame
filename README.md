@@ -15,15 +15,34 @@ python dev-server.py 5173
 
 ブラウザで http://localhost:5173/ を開きます。`Cache-Control: no-store` ヘッダを返すので、JSを編集 → 更新で即反映されます。
 
+### 公開デプロイ (GitHub Pages)
+
+`main` に push すると自動デプロイされます: **https://nexavo409.github.io/Promptgame/**
+
+(初回のみ GitHub の Settings → Pages → Source を "GitHub Actions" に設定してください。)
+
+スマホからもこの URL でアクセス可能です。
+
 ### AI バックエンドの設定（任意）
 
 ヘッダ右上の ⚙ をクリックして設定:
 
-- **Anthropic API キー** (`sk-ant-...`): Claude を使う
-- **LM Studio URL** (`http://192.168.1.3:1234` など): ローカル LM Studio を使う
-- 両方空: 決定論的モック採点（オフラインで挙動確認用）
+- **OpenAI互換サーバー URL** (優先される):
+  - LM Studio: `http://192.168.1.3:1234` （ベースURLでOK）
+  - Ollama: `http://192.168.1.3:11434`
+  - vLLM: `http://192.168.1.3:8000`
+  - OpenWebUI: `http://my-openwebui:8080/api/chat/completions` （完全URL推奨）
+- **Bearer トークン** (任意・OpenWebUI など認証必須のサーバ用)
+- **Anthropic API キー** (`sk-ant-...`): クラウド Claude を使う
+- 全て空: 決定論的モック採点（オフラインで挙動確認用）
 
-LM Studio URL が入っていればそちらが優先されます。
+優先順位: **OpenAI互換 → Anthropic → モック**
+
+#### スマホから自宅の OpenWebUI に繋ぐ場合
+
+- 同一 WiFi 内なら、OpenWebUI の URL をローカル IP で指定
+- 外出先からアクセスする場合は Tailscale / Cloudflare Tunnel 等で OpenWebUI を公開
+- スマホブラウザは `http://` の API への mixed-content をブロックすることがあるため、OpenWebUI 側に SSL を被せるのが理想
 
 ## レッスン構成（8 段階）
 

@@ -8,20 +8,43 @@ const MODEL_GENERATE = 'claude-haiku-4-5-20251001';
 const MODEL_JUDGE = 'claude-haiku-4-5-20251001';
 
 // ---- Backend selection ----
-export function getLMStudioURL() {
+// "openai-compat" covers LM Studio / OpenWebUI / Ollama / vLLM and similar
+// OpenAI-compatible HTTP servers. Key kept as 'pa.lmstudioUrl' for backwards
+// compatibility with existing localStorage values.
+export function getOpenAIURL() {
   return localStorage.getItem('pa.lmstudioUrl') || '';
 }
-export function setLMStudioURL(url) {
+export function setOpenAIURL(url) {
   if (url) localStorage.setItem('pa.lmstudioUrl', url.replace(/\/+$/, ''));
   else localStorage.removeItem('pa.lmstudioUrl');
 }
+export function getOpenAIBearer() {
+  return localStorage.getItem('pa.openaiBearer') || '';
+}
+export function setOpenAIBearer(token) {
+  if (token) localStorage.setItem('pa.openaiBearer', token);
+  else localStorage.removeItem('pa.openaiBearer');
+}
+// Backwards-compat aliases (in case other modules still reference old names)
+export const getLMStudioURL = getOpenAIURL;
+export const setLMStudioURL = setOpenAIURL;
+
 export function activeBackend() {
-  if (getLMStudioURL()) return 'lmstudio';
+  if (getOpenAIURL()) return 'openai-compat';
   if (getApiKey()) return 'anthropic';
   return 'mock';
 }
 export function hasAIBackend() {
   return activeBackend() !== 'mock';
+}
+
+/** Resolve the user-supplied URL to a full chat-completions endpoint. */
+function resolveChatEndpoint(base) {
+  const url = base.replace(/\/+$/, '');
+  // If the user gave us a full endpoint, trust it.
+  if (/\/chat\/completions$/.test(url)) return url;
+  // Common OpenAI-compatible convention: /v1/chat/completions
+  return url + '/v1/chat/completions';
 }
 
 const EXPLAIN_SYSTEM = `あなたはプロンプトエンジニアリングを教える簡潔で実用的な教師です。
@@ -101,18 +124,24 @@ async function callAnthropic({ model, system, messages, max_tokens = 1024 }) {
   return text;
 }
 
-async function callLMStudio({ system, messages, max_tokens = 1024 }) {
-  const base = getLMStudioURL();
-  if (!base) throw new Error('LM Studio URL is not set');
-  const endpoint = base + '/v1/chat/completions';
+async function callOpenAICompatible({ system, messages, max_tokens = 1024 }) {
+  const base = getOpenAIURL();
+  if (!base) throw new Error('OpenAI互換サーバーURLが設定されていません');
+  const endpoint = resolveChatEndpoint(base);
   const fullMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
+  const token = getOpenAIBearer();
 
-  // LM Studio + larger local models can take a while; 3 min timeout.
+  const headers = { 'content-type': 'application/json' };
+  if (token) headers['authorization'] = 'Bearer ' + token;
+
+  // Local LLMs (LM Studio / OpenWebUI / Ollama / vLLM) can be slow; 3 min timeout.
   const res = await fetchWithTimeout(endpoint, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify({
-      model: 'local-model',  // LM Studio uses whichever model is currently loaded
+      // Most OpenAI-compatible servers ignore this and use the loaded/default
+      // model. Some (OpenWebUI) require it — let users override later if needed.
+      model: 'local-model',
       messages: fullMessages,
       max_tokens,
       stream: false,
@@ -120,7 +149,7 @@ async function callLMStudio({ system, messages, max_tokens = 1024 }) {
   }, 180000);
   if (!res.ok) {
     const txt = await res.text();
-    throw new Error(`LM Studio ${res.status}: ${txt}`);
+    throw new Error(`OpenAI互換 ${res.status}: ${txt}`);
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content || '';
@@ -129,9 +158,9 @@ async function callLMStudio({ system, messages, max_tokens = 1024 }) {
 /** Dispatch to whichever backend is configured. */
 async function callBackend(opts) {
   const backend = activeBackend();
-  if (backend === 'lmstudio') return callLMStudio(opts);
+  if (backend === 'openai-compat') return callOpenAICompatible(opts);
   if (backend === 'anthropic') return callAnthropic(opts);
-  throw new Error('No AI backend configured');
+  throw new Error('AIバックエンドが設定されていません');
 }
 
 /**

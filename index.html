@@ -21,13 +21,26 @@
       <button class="header-icon-btn" id="settingsBtn" type="button" title="AIバックエンド設定">⚙</button>
       <div id="settingsPopover" class="settings-popover hidden">
         <h4>AI バックエンド設定</h4>
+
+        <label>OpenAI互換サーバー URL <span class="muted small">(任意・優先される)</span></label>
+        <input type="text" id="lmstudioInput" placeholder="http://192.168.1.3:1234  /  http://my-openwebui:8080/api/chat/completions" autocomplete="off" />
+        <p class="muted small">
+          LM Studio / Ollama / vLLM はベース URL でOK（自動で <code>/v1/chat/completions</code> を付与）。
+          OpenWebUI は <code>/api/chat/completions</code> まで含めた完全 URL を入れてください。
+        </p>
+
+        <label>Bearer トークン <span class="muted small">(OpenWebUI など認証が必要なサーバ用)</span></label>
+        <input type="password" id="bearerInput" placeholder="OpenWebUI の API キーなど（任意）" autocomplete="off" />
+
+        <hr style="border:none; border-top:1px solid var(--line); margin:12px 0;" />
+
         <label>Anthropic API キー</label>
         <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
-        <label>LM Studio URL <span class="muted small">(任意・優先される)</span></label>
-        <input type="text" id="lmstudioInput" placeholder="http://192.168.1.3:1234" autocomplete="off" />
-        <p class="muted small">LM Studio URL が入っていればそちらを優先。両方空ならモック。</p>
+
+        <p class="muted small">優先順位: OpenAI互換サーバー → Anthropic → モック</p>
+
         <div class="settings-actions">
-          <button class="btn tiny ghost" id="clearKeyBtn" type="button">解除</button>
+          <button class="btn tiny ghost" id="clearKeyBtn" type="button">全て解除</button>
           <button class="btn tiny primary" id="saveKeyBtn" type="button">保存</button>
         </div>
       </div>

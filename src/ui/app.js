@@ -5,7 +5,8 @@ import { loadLessonProgress, recordAttempt, resetLesson, unlockedLessons,
          saveDraft, loadDraft, clearDraft } from '../game/progress.js';
 import { generateOutput, judgeOutput, explainResult, improvePrompt,
          hasApiKey, setApiKey, getApiKey,
-         hasAIBackend, activeBackend, getLMStudioURL, setLMStudioURL } from '../ai/client.js';
+         hasAIBackend, activeBackend,
+         getOpenAIURL, setOpenAIURL, getOpenAIBearer, setOpenAIBearer } from '../ai/client.js';
 import { lineDiff, renderDiffHtml } from '../game/diff.js';
 
 const state = {
@@ -55,12 +56,14 @@ function show(screen) {
 function bindHeader() {
   const keyInput = document.getElementById('apiKeyInput');
   const lmInput = document.getElementById('lmstudioInput');
+  const bearerInput = document.getElementById('bearerInput');
   const keyStatus = document.getElementById('apiKeyStatus');
   const popover = document.getElementById('settingsPopover');
   const gearBtn = document.getElementById('settingsBtn');
 
   keyInput.value = getApiKey();
-  lmInput.value = getLMStudioURL();
+  lmInput.value = getOpenAIURL();
+  if (bearerInput) bearerInput.value = getOpenAIBearer();
   updateKeyStatus();
 
   gearBtn.addEventListener('click', (e) => {
@@ -76,24 +79,31 @@ function bindHeader() {
 
   document.getElementById('saveKeyBtn').addEventListener('click', () => {
     setApiKey(keyInput.value.trim());
-    setLMStudioURL(lmInput.value.trim());
+    setOpenAIURL(lmInput.value.trim());
+    if (bearerInput) setOpenAIBearer(bearerInput.value.trim());
     updateKeyStatus();
     popover.classList.add('hidden');
   });
   document.getElementById('clearKeyBtn').addEventListener('click', () => {
     keyInput.value = '';
     lmInput.value = '';
+    if (bearerInput) bearerInput.value = '';
     setApiKey('');
-    setLMStudioURL('');
+    setOpenAIURL('');
+    setOpenAIBearer('');
     updateKeyStatus();
   });
   document.getElementById('brandHome').addEventListener('click', () => show('home'));
 
   function updateKeyStatus() {
     const backend = activeBackend();
-    if (backend === 'lmstudio') {
-      keyStatus.textContent = '● LM Studio';
-      keyStatus.title = `LM Studio (${getLMStudioURL()})`;
+    if (backend === 'openai-compat') {
+      const url = getOpenAIURL();
+      const host = url.replace(/^https?:\/\//, '').split('/')[0];
+      const looksLikeOpenWebUI = /openwebui|\/api\/chat\/completions$/i.test(url);
+      const label = looksLikeOpenWebUI ? 'OpenWebUI' : 'OpenAI互換';
+      keyStatus.textContent = `● ${label}`;
+      keyStatus.title = `${label} (${url})${getOpenAIBearer() ? ' • Bearer設定済' : ''}`;
     } else if (backend === 'anthropic') {
       keyStatus.textContent = '● Claude';
       keyStatus.title = 'Anthropic Claude API';
@@ -662,7 +672,7 @@ function renderResolving() {
       <h3 id="resolvingStatus" class="headspace-title">AI があなたのプロンプトを実行中</h3>
       <p class="reflection">${escape(reflection)}</p>
       <p class="muted small">${
-        activeBackend() === 'lmstudio' ? '🟢 LM Studio を呼び出し中' :
+        activeBackend() === 'openai-compat' ? '🟢 OpenAI互換サーバーを呼び出し中' :
         activeBackend() === 'anthropic' ? '🟢 Anthropic API を呼び出し中' :
         '○ モック実行中（APIキー未設定）'
       }</p>
