@@ -13,7 +13,6 @@ import { lineDiff, renderDiffHtml } from '../game/diff.js';
 import { renderMarkdown } from '../util/markdown.js';
 import { celebrate, isMuted, setMuted } from '../util/effects.js';
 import { initTheme, getThemePref, setThemePref, nextTheme, themeLabel } from '../util/theme.js';
-import { startHeroParticles } from '../util/hero-particles.js';
 
 const state = {
   screen: 'home',         // home | lesson | free
@@ -71,7 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindFooter();
   show('home');
   initKeyboardDetection();
-  startHeroParticles();
 });
 
 function bindFooter() {

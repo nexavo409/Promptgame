@@ -143,15 +143,10 @@
               <text x="222" y="142" text-anchor="middle" font-size="7" fill="#15803d" font-weight="700">output</text>
             </g>
 
-            <!-- Particles — positions and opacity driven by JS rAF.
-                 SMIL was inconsistent across Chrome desktop / iOS Safari;
-                 setAttribute on transform/opacity works on every browser. -->
-            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#6366f1" /></g>
-            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#8b5cf6" /></g>
-            <g data-particle transform="translate(92,110)" opacity="0"><circle r="3.2" fill="#f472b6" /></g>
-            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#a78bfa" /></g>
-            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#34d399" /></g>
-            <g data-particle transform="translate(140,110)" opacity="0"><circle r="3.2" fill="#60a5fa" /></g>
+            <!-- Particles removed: cross-browser SVG animation was a
+                 maintenance trap (SMIL ↔ CSS each broke a different
+                 platform). The orb pulse + sparks (CSS) carry the
+                 motion now, and they work everywhere reliably. -->
           </svg>
         </div>
       </div>
