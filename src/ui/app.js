@@ -12,6 +12,7 @@ import { generateOutput, judgeOutput, explainResult, improvePrompt, generateAIPr
 import { lineDiff, renderDiffHtml } from '../game/diff.js';
 import { renderMarkdown } from '../util/markdown.js';
 import { initTheme, getThemePref, setThemePref, nextTheme, themeLabel } from '../util/theme.js';
+import { startHeroTyper } from '../util/hero-typer.js';
 
 const state = {
   screen: 'home',         // home | lesson | free
@@ -69,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindFooter();
   show('home');
   initKeyboardDetection();
+  startHeroTyper();
 });
 
 function bindFooter() {
