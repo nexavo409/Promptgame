@@ -511,8 +511,13 @@ function openFreePractice() {
   state.currentLesson = null;
   state.currentTopic = randomFreeTopic();
   state.attempt = null;
+  state.compare = new Set();
   show('free');
   renderFree();
+}
+
+function freeSlotId() {
+  return state.currentTopic ? 'free.' + state.currentTopic.id : null;
 }
 
 function randomFreeTopic() {
@@ -521,6 +526,9 @@ function randomFreeTopic() {
 
 function renderFree() {
   const topic = state.currentTopic;
+  const slot = freeSlotId();
+  const p = slot ? loadLessonProgress(slot) : { history: [] };
+
   const root = document.getElementById('freeRoot');
   root.innerHTML = `
     <div class="screen-toolbar">
@@ -535,6 +543,7 @@ function renderFree() {
           <span class="badge cat">${escape(CATEGORY_LABEL[topic.category] || topic.category)}</span>
           <span class="badge">${topic.difficulty === 'high' ? '難易度: 高' : '難易度: 標準'}</span>
           <span class="badge">自由練習（通過条件なし）</span>
+          ${p.bestScore ? `<span class="badge passed">このお題のベスト ${p.bestScore.total.toFixed(1)}</span>` : ''}
         </div>
         <h2>お題: ${escape(topic.title)}</h2>
         <p>${escape(topic.brief)}</p>
@@ -550,6 +559,14 @@ function renderFree() {
       </div>
 
       <div id="resultArea"></div>
+
+      ${p.history.length > 0 ? `
+        <details class="history-panel" open>
+          <summary>📜 このお題の過去の試行 (${p.history.length}件)</summary>
+          <div id="historyList"></div>
+          <div id="historyDiff"></div>
+        </details>
+      ` : ''}
     </div>
   `;
 
@@ -557,6 +574,7 @@ function renderFree() {
   document.getElementById('reshuffleBtn').addEventListener('click', () => {
     state.currentTopic = randomFreeTopic();
     state.attempt = null;
+    state.compare = new Set();
     renderFree();
   });
   const ta = document.getElementById('promptInput');
@@ -570,6 +588,7 @@ function renderFree() {
   document.getElementById('tryBtn').addEventListener('click', onTryFree);
 
   if (state.attempt) renderResult(state.attempt);
+  if (p.history.length > 0) renderHistory(p.history);
 }
 
 async function onTryFree() {
@@ -591,7 +610,10 @@ async function onTryFree() {
     setResolvingStatus('教師が解説中…');
     const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
-    state.attempt = { prompt, output, judge, explanation, passed: false };
+    const attempt = { prompt, output, judge, explanation, passed: false };
+    state.attempt = attempt;
+    const slot = freeSlotId();
+    if (slot) recordAttempt(slot, attempt);
     clearDraft(draftSlot());
     renderFree();
   } catch (e) {
