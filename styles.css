@@ -111,6 +111,68 @@ html, body {
   transition: background-color 0.3s var(--ease), color 0.3s var(--ease);
 }
 
+/* Placeholder text needs explicit color in dark mode (browser default is too dim) */
+:root[data-theme="dark"] textarea::placeholder,
+:root[data-theme="dark"] input::placeholder {
+  color: #64748b;
+}
+
+/* Hardcoded-color elements that need dark fixes */
+:root[data-theme="dark"] .md-body { color: var(--ink); }
+:root[data-theme="dark"] .md-body strong { color: #fff; }
+:root[data-theme="dark"] .diff-line.diff-eq { color: #94a3b8; }
+:root[data-theme="dark"] .diff-line.diff-add { background: #052e1f; color: #6ee7b7; }
+:root[data-theme="dark"] .diff-line.diff-del { background: #422006; color: #fca5a5; }
+:root[data-theme="dark"] .diff-body { background: #0b1120; }
+:root[data-theme="dark"] .vs-detail summary { color: #fcd34d; }
+:root[data-theme="dark"] .vs-detail pre { background: #0b1120; color: var(--ink); border-color: var(--line); }
+:root[data-theme="dark"] .vs-tip { background: rgba(255, 255, 255, 0.05); }
+:root[data-theme="dark"] .lib-card-why {
+  background: linear-gradient(135deg, #052e1f 0%, var(--panel) 100%);
+  border-left-color: #10b981;
+}
+:root[data-theme="dark"] .lib-card-why p { color: #6ee7b7; }
+:root[data-theme="dark"] .why-label { background: #064e3b; color: #6ee7b7; }
+:root[data-theme="dark"] .lib-prompt-box { background: var(--panel-soft); }
+:root[data-theme="dark"] .lib-card { background: var(--panel); }
+:root[data-theme="dark"] .tech-chip { background: #1e1b4b; color: #c4b5fd; }
+:root[data-theme="dark"] .lib-tab { color: var(--ink-soft); }
+:root[data-theme="dark"] .lib-tab:not(.active) .lib-tab-count { background: var(--line); color: var(--ink-soft); }
+:root[data-theme="dark"] .badge { background: var(--panel-soft); color: var(--ink-soft); border-color: var(--line); }
+:root[data-theme="dark"] .badge.cat { background: var(--grad-brand-soft); color: #c4b5fd; }
+:root[data-theme="dark"] .badge.passed { background: #052e1f; color: #6ee7b7; border-color: #047857; }
+:root[data-theme="dark"] .badge.source-ai { background: #052e1f; color: #6ee7b7; border-color: #047857; }
+:root[data-theme="dark"] .badge.source-sample { background: #422006; color: #fcd34d; border-color: #b45309; }
+:root[data-theme="dark"] .badge.hi { background: #422006; color: #fcd34d; border-color: #b45309; }
+:root[data-theme="dark"] .warn-chip.warn { background: #422006; color: #fcd34d; }
+:root[data-theme="dark"] .warn-chip.err { background: #450a0a; color: #fca5a5; }
+:root[data-theme="dark"] .syn-chip { background: #064e3b; color: #6ee7b7; }
+:root[data-theme="dark"] .util-log-row { background: #422006; color: #fcd34d; }
+:root[data-theme="dark"] .organize-banner { background: #450a0a; color: #fca5a5; border-color: #991b1b; }
+:root[data-theme="dark"] .recipe-side { background: var(--panel-soft); border-color: var(--line); }
+:root[data-theme="dark"] .recipe-step-pill { color: #fff; }
+:root[data-theme="dark"] .output-detail pre, :root[data-theme="dark"] .judge-detail pre,
+:root[data-theme="dark"] .history-row pre, :root[data-theme="dark"] .prompt-preview-body { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .lib-prompt { background: #050811; }
+:root[data-theme="dark"] .footer-bottom { color: #475569 !important; }
+:root[data-theme="dark"] .lesson-explainer p,
+:root[data-theme="dark"] .quickhelp p { color: var(--ink-soft); }
+:root[data-theme="dark"] .lesson-explainer .hint-line { background: #422006; color: #fcd34d; border-color: #b45309; }
+:root[data-theme="dark"] .lib-prompt-box summary { color: #c4b5fd; }
+:root[data-theme="dark"] .example-prompt pre { background: var(--panel); border-color: var(--line); color: var(--ink); }
+:root[data-theme="dark"] .lesson-row:hover { border-color: #4338ca; }
+:root[data-theme="dark"] .value-card:hover { border-color: #4338ca; }
+:root[data-theme="dark"] .vs-stat .vs-total { color: #c4b5fd; }
+:root[data-theme="dark"] .vs-stat.ai .vs-total { color: #fcd34d; }
+:root[data-theme="dark"] .result-banner { color: var(--ink); }
+:root[data-theme="dark"] .result-score b { color: #c4b5fd; }
+:root[data-theme="dark"] .judge-detail p { color: var(--ink-soft); }
+:root[data-theme="dark"] .about-section code { background: var(--panel-soft); color: #f0abfc; }
+:root[data-theme="dark"] .about-tagline { color: #c4b5fd; }
+:root[data-theme="dark"] .hero-eyebrow { background: var(--grad-brand-soft); color: #c4b5fd; }
+:root[data-theme="dark"] .lesson-summary { color: var(--ink-soft); }
+:root[data-theme="dark"] .topic-card p { color: var(--ink-soft); }
+
 html, body {
   margin: 0;
   padding: 0;
@@ -1423,7 +1485,7 @@ h3 { font-size: 17px; margin: 0 0 8px; line-height: 1.5; }
 }
 
 /* Markdown body (for AI outputs in result and history) */
-.md-body { font-size: 14px; line-height: 1.75; color: #1f2937; }
+.md-body { font-size: 14px; line-height: 1.75; color: var(--ink); }
 .md-body > *:first-child { margin-top: 0; }
 .md-body > *:last-child  { margin-bottom: 0; }
 .md-body p { margin: 0.6em 0; }

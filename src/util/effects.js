@@ -101,19 +101,69 @@ export function fireConfetti(intensity = 1) {
   requestAnimationFrame(tick);
 }
 
+// Single shared AudioContext. iOS Safari only allows AudioContext creation /
+// resume() from within a user gesture; once unlocked, reuse forever.
+let sharedCtx = null;
+let audioUnlocked = false;
+
+function getAudioContext() {
+  if (sharedCtx) return sharedCtx;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try { sharedCtx = new AC(); } catch { return null; }
+  return sharedCtx;
+}
+
+/**
+ * Prime the audio context inside a user gesture. Call this from any
+ * click/touch handler. iOS will then allow audio to play later.
+ */
+export function unlockAudio() {
+  if (audioUnlocked) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  // Play a silent buffer to fully unlock on iOS Safari
+  try {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch {}
+  audioUnlocked = true;
+}
+
+// Auto-attach: first user interaction unlocks audio for the whole session.
+if (typeof document !== 'undefined') {
+  const handler = () => {
+    unlockAudio();
+    document.removeEventListener('pointerdown', handler);
+    document.removeEventListener('keydown', handler);
+    document.removeEventListener('touchstart', handler);
+  };
+  document.addEventListener('pointerdown', handler, { passive: true });
+  document.addEventListener('keydown', handler);
+  document.addEventListener('touchstart', handler, { passive: true });
+}
+
 /**
  * Play a short chime via Web Audio. type='pass' = major triad,
  * type='best' = brighter rising arpeggio.
  */
 export function playChime(type = 'pass') {
   if (isMuted()) return;
-  const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  // Resume in case the page was backgrounded
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+  const notes = type === 'best'
+    ? [659.25, 880, 1108.73, 1318.51] // E5 A5 C#6 E6
+    : [659.25, 880, 1108.73];          // E5 A5 C#6
   try {
-    const ctx = new AC();
-    const notes = type === 'best'
-      ? [659.25, 880, 1108.73, 1318.51] // E5 A5 C#6 E6
-      : [659.25, 880, 1108.73];          // E5 A5 C#6
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -122,14 +172,12 @@ export function playChime(type = 'pass') {
       osc.connect(gain);
       gain.connect(ctx.destination);
       const t0 = ctx.currentTime + i * 0.07;
-      gain.gain.setValueAtTime(0, t0);
-      gain.gain.linearRampToValueAtTime(0.12, t0 + 0.02);
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(0.14, t0 + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.9);
       osc.start(t0);
       osc.stop(t0 + 0.95);
     });
-    // Auto-close to free resources
-    setTimeout(() => { try { ctx.close(); } catch {} }, 1500);
   } catch {}
 }
 

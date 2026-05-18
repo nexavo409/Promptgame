@@ -156,32 +156,34 @@
               <text x="222" y="142" text-anchor="middle" font-size="7" fill="#15803d" font-weight="700">output</text>
             </g>
 
-            <!-- Flowing particles: left → orb → right -->
+            <!-- Flowing particles: left card → orb → right card -->
             <g class="hero-particles">
-              <circle r="2.2" fill="#6366f1">
-                <animateMotion dur="2.4s" repeatCount="indefinite" path="M92 110 Q110 110 106 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" repeatCount="indefinite" />
+              <!-- LEFT → ORB (3 particles, arc up) -->
+              <circle r="3" fill="#6366f1">
+                <animateMotion dur="2.4s" repeatCount="indefinite" path="M92,110 Q116,86 140,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" repeatCount="indefinite" />
               </circle>
-              <circle r="2.2" fill="#8b5cf6">
-                <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite" path="M92 105 Q110 110 106 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+              <circle r="3" fill="#8b5cf6">
+                <animateMotion dur="2.4s" begin="0.8s" repeatCount="indefinite" path="M92,110 Q116,110 140,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
               </circle>
-              <circle r="2.2" fill="#f472b6">
-                <animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite" path="M92 115 Q110 110 106 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
+              <circle r="3" fill="#f472b6">
+                <animateMotion dur="2.4s" begin="1.6s" repeatCount="indefinite" path="M92,110 Q116,134 140,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
               </circle>
 
-              <circle r="2.2" fill="#a78bfa">
-                <animateMotion dur="2.4s" repeatCount="indefinite" path="M174 110 Q188 110 188 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" repeatCount="indefinite" />
+              <!-- ORB → RIGHT (3 particles, arc up) -->
+              <circle r="3" fill="#a78bfa">
+                <animateMotion dur="2.4s" repeatCount="indefinite" path="M140,110 Q164,86 188,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" repeatCount="indefinite" />
               </circle>
-              <circle r="2.2" fill="#34d399">
-                <animateMotion dur="2.4s" begin="1.0s" repeatCount="indefinite" path="M174 105 Q188 110 188 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" begin="1.0s" repeatCount="indefinite" />
+              <circle r="3" fill="#34d399">
+                <animateMotion dur="2.4s" begin="1.0s" repeatCount="indefinite" path="M140,110 Q164,110 188,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.0s" repeatCount="indefinite" />
               </circle>
-              <circle r="2.2" fill="#60a5fa">
-                <animateMotion dur="2.4s" begin="1.8s" repeatCount="indefinite" path="M174 115 Q188 110 188 110" />
-                <animate attributeName="opacity" values="0;1;0" dur="2.4s" begin="1.8s" repeatCount="indefinite" />
+              <circle r="3" fill="#60a5fa">
+                <animateMotion dur="2.4s" begin="1.8s" repeatCount="indefinite" path="M140,110 Q164,134 188,110" />
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="2.4s" begin="1.8s" repeatCount="indefinite" />
               </circle>
             </g>
           </svg>
