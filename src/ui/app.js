@@ -1,17 +1,27 @@
 // Prompt Architect — Lesson-based prompt engineering tutor.
 
 import { LESSONS, LESSON_BY_ID, FREE_TOPICS, CATEGORY_LABEL, checkPass, passText } from '../data/lessons.js';
-import { loadLessonProgress, recordAttempt, resetLesson, unlockedLessons } from '../game/progress.js';
-import { generateOutput, judgeOutput, explainResult, hasApiKey, setApiKey, getApiKey,
+import { loadLessonProgress, recordAttempt, resetLesson, unlockedLessons,
+         saveDraft, loadDraft, clearDraft } from '../game/progress.js';
+import { generateOutput, judgeOutput, explainResult, improvePrompt,
+         hasApiKey, setApiKey, getApiKey,
          hasAIBackend, activeBackend, getLMStudioURL, setLMStudioURL } from '../ai/client.js';
+import { lineDiff, renderDiffHtml } from '../game/diff.js';
 
 const state = {
   screen: 'home',         // home | lesson | free
   currentLesson: null,
   currentTopic: null,     // for free mode
   attempt: null,          // { prompt, output, judge, explanation, passed } | null
+  compare: new Set(),     // history indices selected for diff compare
   busy: false,
 };
+
+function draftSlot() {
+  if (state.screen === 'lesson' && state.currentLesson) return 'lesson.' + state.currentLesson.id;
+  if (state.screen === 'free') return 'free';
+  return null;
+}
 
 // ============== Boot ==============
 document.addEventListener('DOMContentLoaded', () => {
@@ -166,6 +176,7 @@ function openLesson(lessonId) {
   state.currentLesson = lesson;
   state.currentTopic = lesson.topic;
   state.attempt = null;
+  state.compare = new Set();
   show('lesson');
   renderLesson();
 }
@@ -226,9 +237,10 @@ function renderLesson() {
       <div id="resultArea"></div>
 
       ${p.history.length > 0 ? `
-        <details class="history-panel">
-          <summary>📜 過去の試行 (${p.history.length}件)</summary>
+        <details class="history-panel" open>
+          <summary>📜 このレッスンの過去の試行 (${p.history.length}件)</summary>
           <div id="historyList"></div>
+          <div id="historyDiff"></div>
         </details>
       ` : ''}
     </div>
@@ -236,8 +248,13 @@ function renderLesson() {
 
   document.getElementById('backToHome').addEventListener('click', () => show('home'));
   const ta = document.getElementById('promptInput');
+  // Restore draft if any
+  const draft = loadDraft(draftSlot());
+  if (draft) ta.value = draft;
+  document.getElementById('charCount').textContent = `${ta.value.length} 字`;
   ta.addEventListener('input', () => {
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
+    saveDraft(draftSlot(), ta.value);
   });
   document.getElementById('tryBtn').addEventListener('click', onTry);
   const copyBtn = document.getElementById('copyExampleBtn');
@@ -245,6 +262,7 @@ function renderLesson() {
     e.preventDefault();
     ta.value = lesson.examplePrompt;
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
+    saveDraft(draftSlot(), ta.value);
     ta.focus();
   });
 
@@ -256,12 +274,36 @@ function renderHistory(history) {
   const list = document.getElementById('historyList');
   if (!list) return;
   list.innerHTML = '';
+
+  // Compare control bar
+  const bar = document.createElement('div');
+  bar.className = 'history-compare-bar';
+  const selCount = state.compare.size;
+  bar.innerHTML = `
+    <span class="muted small">2つの試行にチェック → 比較すると差分が見えます (${selCount}/2 選択中)</span>
+    <button class="btn tiny primary" id="compareBtn" ${selCount === 2 ? '' : 'disabled'}>選んだ2つを比較</button>
+    ${selCount > 0 ? '<button class="btn tiny ghost" id="clearCompareBtn">選択解除</button>' : ''}
+  `;
+  list.appendChild(bar);
+
+  bar.querySelector('#compareBtn')?.addEventListener('click', () => renderDiff(history));
+  bar.querySelector('#clearCompareBtn')?.addEventListener('click', () => {
+    state.compare.clear();
+    document.getElementById('historyDiff').innerHTML = '';
+    renderHistory(history);
+  });
+
   history.forEach((h, i) => {
     const total = (h.judge.accuracy || 0) + (h.judge.utility || 0) + (h.judge.novelty || 0);
     const row = document.createElement('div');
     row.className = 'history-row';
+    const checked = state.compare.has(i) ? 'checked' : '';
+    const disabled = !state.compare.has(i) && state.compare.size >= 2 ? 'disabled' : '';
     row.innerHTML = `
       <div class="history-head">
+        <label class="compare-check" title="比較対象に含める">
+          <input type="checkbox" class="history-check" data-idx="${i}" ${checked} ${disabled} />
+        </label>
         <span class="history-num">#${history.length - i}</span>
         <span class="history-score">${total.toFixed(1)} 点</span>
         <span class="history-axes muted small">正${h.judge.accuracy} / 役${h.judge.utility} / 新${h.judge.novelty}</span>
@@ -279,6 +321,51 @@ function renderHistory(history) {
     `;
     list.appendChild(row);
   });
+
+  list.querySelectorAll('.history-check').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      if (cb.checked) {
+        if (state.compare.size >= 2) { cb.checked = false; return; }
+        state.compare.add(idx);
+      } else {
+        state.compare.delete(idx);
+      }
+      renderHistory(history);
+    });
+  });
+}
+
+function renderDiff(history) {
+  const idxs = [...state.compare].sort((a, b) => b - a); // older first (newer has smaller idx)
+  if (idxs.length !== 2) return;
+  const older = history[idxs[0]];
+  const newer = history[idxs[1]];
+  const totalOld = (older.judge.accuracy || 0) + (older.judge.utility || 0) + (older.judge.novelty || 0);
+  const totalNew = (newer.judge.accuracy || 0) + (newer.judge.utility || 0) + (newer.judge.novelty || 0);
+  const delta = totalNew - totalOld;
+  const deltaStr = (delta > 0 ? '+' : '') + delta.toFixed(1);
+
+  const ops = lineDiff(older.prompt, newer.prompt);
+  const diffHtml = renderDiffHtml(ops, escape);
+
+  const host = document.getElementById('historyDiff');
+  if (!host) return;
+  host.innerHTML = `
+    <div class="diff-panel">
+      <div class="diff-head">
+        <b>📊 試行 #${history.length - idxs[0]} → #${history.length - idxs[1]}</b>
+        <span class="muted small">${totalOld.toFixed(1)} 点 → ${totalNew.toFixed(1)} 点 (<b class="${delta >= 0 ? 'delta-up' : 'delta-down'}">${deltaStr} 点</b>)</span>
+        <button class="btn tiny ghost" id="closeDiffBtn">× 閉じる</button>
+      </div>
+      <p class="muted small">緑 = 新しいバージョンで追加された行 / 赤 = 古いバージョンにあって消えた行 / 白 = 共通</p>
+      <div class="diff-body">${diffHtml}</div>
+    </div>
+  `;
+  host.querySelector('#closeDiffBtn')?.addEventListener('click', () => {
+    host.innerHTML = '';
+  });
+  host.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function onTry() {
@@ -307,6 +394,7 @@ async function onTry() {
     const attempt = { prompt, output, judge, explanation, passed };
     state.attempt = attempt;
     recordAttempt(lesson.id, attempt);
+    clearDraft(draftSlot());
 
     // Re-render the lesson (so history updates), then surface the result
     renderLesson();
@@ -352,7 +440,13 @@ function renderResult(attempt) {
       <div class="teacher-panel">
         <div class="teacher-head">📚 教師からのひと言</div>
         <p><b>👍 良かった点:</b> ${escape(explanation.praise)}</p>
-        <p><b>🌱 もっと良くするには:</b> ${escape(explanation.improve)}</p>
+        <p class="improve-line">
+          <b>🌱 もっと良くするには:</b> ${escape(explanation.improve)}
+          <button class="btn tiny ghost improve-btn" id="aiImproveBtn"
+                  title="教師の提案を反映した改善版プロンプトをAIに作らせて、エディタに挿入します">
+            💡 AIに改善版を書かせる
+          </button>
+        </p>
         <p class="lesson"><b>💡 今日のレッスン:</b> ${escape(explanation.lesson)}</p>
       </div>
       <div class="result-actions">
@@ -368,11 +462,43 @@ function renderResult(attempt) {
     const nxt = nextLesson(state.currentLesson.id);
     if (nxt) openLesson(nxt.id);
   });
+  document.getElementById('aiImproveBtn')?.addEventListener('click', () => onAIImprove(attempt));
 
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
   // Set the prompt back into textarea so user sees what they sent
   const ta = document.getElementById('promptInput');
   if (ta && !ta.value) ta.value = prompt;
+}
+
+async function onAIImprove(attempt) {
+  if (state.busy) return;
+  const topic = state.currentTopic;
+  if (!topic || !attempt) return;
+  state.busy = true;
+  const btn = document.getElementById('aiImproveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '✏️ 改善版を生成中…'; }
+  try {
+    const improved = await improvePrompt({
+      prompt: attempt.prompt,
+      improveAdvice: attempt.explanation?.improve || '',
+      topic,
+    });
+    const ta = document.getElementById('promptInput');
+    if (ta) {
+      ta.value = improved;
+      ta.focus();
+      saveDraft(draftSlot(), ta.value);
+      const cc = document.getElementById('charCount');
+      if (cc) cc.textContent = `${ta.value.length} 字`;
+      ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      flash('改善版をエディタに挿入しました。試してみよう！');
+    }
+  } catch (e) {
+    alert('改善版の生成に失敗: ' + e.message);
+  } finally {
+    state.busy = false;
+    if (btn) { btn.disabled = false; btn.textContent = '💡 AIに改善版を書かせる'; }
+  }
 }
 
 function nextLesson(currentId) {
@@ -434,8 +560,12 @@ function renderFree() {
     renderFree();
   });
   const ta = document.getElementById('promptInput');
+  const draft = loadDraft(draftSlot());
+  if (draft) ta.value = draft;
+  document.getElementById('charCount').textContent = `${ta.value.length} 字`;
   ta.addEventListener('input', () => {
     document.getElementById('charCount').textContent = `${ta.value.length} 字`;
+    saveDraft(draftSlot(), ta.value);
   });
   document.getElementById('tryBtn').addEventListener('click', onTryFree);
 
@@ -462,6 +592,7 @@ async function onTryFree() {
     const explanation = await explainResult({ topic, composedPrompt: prompt, output, judge });
 
     state.attempt = { prompt, output, judge, explanation, passed: false };
+    clearDraft(draftSlot());
     renderFree();
   } catch (e) {
     console.error(e);

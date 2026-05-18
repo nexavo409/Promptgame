@@ -55,6 +55,27 @@ export function resetAll(lessonIds) {
   for (const id of lessonIds) resetLesson(id);
 }
 
+// ===== Draft auto-save =====
+// Saves the user's in-progress prompt per lesson / mode so a page refresh
+// (or LM Studio hiccup) doesn't blow away their typing.
+const DRAFT_PREFIX = 'pa.draft.';
+
+export function saveDraft(slotId, text) {
+  try {
+    if (text && text.length > 0) localStorage.setItem(DRAFT_PREFIX + slotId, text);
+    else localStorage.removeItem(DRAFT_PREFIX + slotId);
+  } catch {}
+}
+
+export function loadDraft(slotId) {
+  try { return localStorage.getItem(DRAFT_PREFIX + slotId) || ''; }
+  catch { return ''; }
+}
+
+export function clearDraft(slotId) {
+  try { localStorage.removeItem(DRAFT_PREFIX + slotId); } catch {}
+}
+
 /** Whether lessons N and earlier are unlocked. Returns set of unlocked ids. */
 export function unlockedLessons(lessons) {
   const unlocked = new Set();

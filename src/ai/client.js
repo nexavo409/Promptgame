@@ -225,6 +225,51 @@ ${output}
   }
 }
 
+const IMPROVE_SYSTEM = `あなたはプロンプトエンジニアリングの実務コーチです。
+ユーザーが書いた既存のプロンプトと、教師からの改善提案を1つ受け取り、
+その提案だけを丁寧に反映した「改善版プロンプト」を返してください。
+
+ルール:
+- 元のプロンプトの構造と長さを尊重し、提案以外の部分は最小限の変更にとどめる
+- 提案を 1 つだけ反映する（推測で勝手に追加機能を入れない）
+- 説明・前置き・コメントは一切書かず、改善版プロンプトの本文のみを返す
+- コードブロック・引用符で囲まず、生のテキストで返す`;
+
+/**
+ * Rewrite the user's prompt by applying a single teacher-suggested improvement.
+ * Returns the improved prompt as plain text (no markdown wrapping).
+ */
+export async function improvePrompt({ prompt, improveAdvice, topic }) {
+  if (!hasAIBackend()) return mockImprovePrompt({ prompt, improveAdvice });
+  const userMsg = `# 元のプロンプト
+${prompt}
+
+# 教師からの改善提案
+${improveAdvice}
+
+# お題（参考）
+${topic.title}: ${topic.brief}
+
+上記の改善提案を反映した「改善版プロンプト」だけを出力してください。`;
+
+  try {
+    const text = await callBackend({
+      model: MODEL_GENERATE,
+      system: IMPROVE_SYSTEM,
+      messages: [{ role: 'user', content: userMsg }],
+      max_tokens: 2048,
+    });
+    // Strip code-fence wrapping if the model added it anyway.
+    return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+  } catch (e) {
+    return mockImprovePrompt({ prompt, improveAdvice });
+  }
+}
+
+function mockImprovePrompt({ prompt, improveAdvice }) {
+  return `${prompt}\n\n[モック改善版 — 実APIで利用するとここに改善版が表示されます]\n（教師からの提案: ${improveAdvice}）`;
+}
+
 function parseExplainResponse(text) {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('解説のJSONが見つかりません');
