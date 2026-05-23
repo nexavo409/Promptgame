@@ -153,20 +153,47 @@ async function callOpenAICompatible({ system, messages, max_tokens = 1024 }) {
   }
   const data = await res.json();
   const msg = data.choices?.[0]?.message;
+  const finishReason = data.choices?.[0]?.finish_reason;
 
-  // Primary: standard `content` field.
-  let content = (msg?.content || '').trim();
+  // Primary: standard `content` field, with leaked thinking blocks stripped.
+  // Some local models embed reasoning inline in content as <think>...</think>
+  // or "Thinking Process: ..." preambles. Strip both so downstream callers
+  // (improvePrompt, generateAIPrompt) don't display the model's internal monologue.
+  let content = stripLeakedThinking(msg?.content || '').trim();
 
-  // Fallback: reasoning-distilled models (DeepSeek-R1, QwQ,
-  // qwen3.5-*-reasoning-distilled, etc.) sometimes burn their entire
-  // token budget on `reasoning_content` and emit nothing in `content`.
-  // Use the reasoning as the response rather than returning "" silently
-  // — silent empties cascade into "AIの出力が空欄" judge failures.
-  if (!content && msg?.reasoning_content) {
+  // Fallback to reasoning_content ONLY when the model finished cleanly
+  // (finish_reason="stop") but content is empty. In that case the
+  // reasoning_content is likely the real answer in disguise.
+  //
+  // DO NOT fall back when finish_reason="length" — that means the model
+  // was cut off mid-thinking, so reasoning_content is incomplete English
+  // internal monologue (NOT the user-facing answer). Returning it would
+  // leak the model's "Thinking Process: 1. Analyze..." trace as the result.
+  if (!content && msg?.reasoning_content && finishReason === 'stop') {
     content = msg.reasoning_content.trim();
   }
 
+  // If we still have nothing AND the model was cut off, throw with a
+  // clear hint so the caller can show the user actionable guidance.
+  if (!content && finishReason === 'length') {
+    throw new Error('reasoning モデルがトークン予算を全て内部思考に費やし、出力が切り捨てられました (finish_reason=length)。max_tokens を増やすか、非 reasoning モデルへの切り替えをお試しください。');
+  }
+
   return content;
+}
+
+/** Strip leaked <think>...</think> blocks and "Thinking Process:" preambles
+ *  that some reasoning models emit inside the user-facing `content` field. */
+function stripLeakedThinking(text) {
+  if (!text) return '';
+  let s = text;
+  // <think>...</think> blocks (DeepSeek-R1 style)
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // "Thinking Process:" English preamble followed by numbered steps,
+  // ending at the first blank line + non-list content (the actual answer).
+  // Matches the failure mode seen in production logs.
+  s = s.replace(/^\s*Thinking Process:[\s\S]*?(?=\n\n[^\d\s\-*])/i, '');
+  return s;
 }
 
 /** Dispatch to whichever backend is configured. */
@@ -326,7 +353,10 @@ ${topic.brief}
       model: MODEL_GENERATE,
       system: META_PROMPT_SYSTEM,
       messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 2048,
+      // Full prompt output can be 500-1000 tokens. With reasoning models
+      // adding 1500-3000 thinking tokens on top, 2048 is too tight and
+      // gets cut off mid-prompt. 4096 gives enough headroom.
+      max_tokens: 4096,
     });
     return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
   } catch (e) {
@@ -385,12 +415,21 @@ ${topic.title}: ${topic.brief}
       model: MODEL_GENERATE,
       system: IMPROVE_SYSTEM,
       messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 2048,
+      // The output IS the entire improved prompt (often 500-1500 tokens).
+      // With reasoning models doing 1500-3000 thinking tokens first, 2048
+      // gets cut off mid-prompt and the reasoning_content leak fallback
+      // ends up serving the user the model's English "Thinking Process:"
+      // monologue. 4096 gives reasoning models room to finish.
+      max_tokens: 4096,
     });
     // Strip code-fence wrapping if the model added it anyway.
     return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
   } catch (e) {
-    return mockImprovePrompt({ prompt, improveAdvice });
+    // Don't silently fall back to mock — surface the reason so the user
+    // knows it's not just "the AI gave a boring answer". The most common
+    // cause is reasoning models eating the token budget; the error message
+    // from callOpenAICompatible already explains that.
+    return `${prompt}\n\n[改善版生成エラー: ${e.message}]\n（元のプロンプトをそのまま返しています）`;
   }
 }
 
