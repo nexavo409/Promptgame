@@ -152,7 +152,21 @@ async function callOpenAICompatible({ system, messages, max_tokens = 1024 }) {
     throw new Error(`OpenAI互換 ${res.status}: ${txt}`);
   }
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || '';
+  const msg = data.choices?.[0]?.message;
+
+  // Primary: standard `content` field.
+  let content = (msg?.content || '').trim();
+
+  // Fallback: reasoning-distilled models (DeepSeek-R1, QwQ,
+  // qwen3.5-*-reasoning-distilled, etc.) sometimes burn their entire
+  // token budget on `reasoning_content` and emit nothing in `content`.
+  // Use the reasoning as the response rather than returning "" silently
+  // — silent empties cascade into "AIの出力が空欄" judge failures.
+  if (!content && msg?.reasoning_content) {
+    content = msg.reasoning_content.trim();
+  }
+
+  return content;
 }
 
 /** Dispatch to whichever backend is configured. */
@@ -171,13 +185,24 @@ export async function generateOutput(composedPrompt) {
     return mockGenerate(composedPrompt);
   }
   try {
-    return await callBackend({
+    const text = await callBackend({
       model: MODEL_GENERATE,
       messages: [{ role: 'user', content: composedPrompt }],
       // Lesson outputs (FAQs, structured explanations, multi-step analyses)
       // can run 5-8k tokens. Be generous to avoid mid-sentence truncation.
       max_tokens: 8192,
     });
+    // Empty content reaching the judge always scores 0/0/0 with a confusing
+    // rationale. Surface the problem here instead so the user can react
+    // (e.g. switch models, increase max_tokens server-side).
+    if (!text || !text.trim()) {
+      return [
+        '【AIが応答本文を生成しませんでした】',
+        'reasoning モデルがトークン予算を全て内部思考に費やし、出力欄が空のまま返ってきた可能性があります。',
+        '対策: より小さな reasoning モデル / 非 reasoning モデルに切り替える、または LM Studio 側で max_tokens を増やす。',
+      ].join('\n');
+    }
+    return text;
   } catch (e) {
     return `【API呼び出しエラー — モック出力にフォールバック】\n${e.message}\n\n` + mockGenerate(composedPrompt);
   }
@@ -189,6 +214,15 @@ export async function generateOutput(composedPrompt) {
 export async function judgeOutput({ topic, composedPrompt, output }) {
   if (!hasAIBackend()) {
     return mockJudge({ topic, composedPrompt, output });
+  }
+  // Short-circuit if generation produced no output. Asking the judge to
+  // score an empty response always returns 0/0/0 with a rationale that
+  // makes the user think the app is broken — give them the real reason.
+  if (!output || !output.trim()) {
+    return {
+      accuracy: 0, utility: 0, novelty: 0,
+      rationale: 'AIが応答本文を生成しなかったため採点できません。reasoning モデルがトークン予算を内部思考に使い切った可能性があります。より小さい reasoning モデル / 非 reasoning モデルへの切り替えをお試しください。',
+    };
   }
   const userMsg = `# お題
 ${topic.title}
