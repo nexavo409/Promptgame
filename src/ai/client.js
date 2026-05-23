@@ -356,11 +356,7 @@ function mockImprovePrompt({ prompt, improveAdvice }) {
 }
 
 function parseExplainResponse(text) {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('解説のJSONが見つかりません');
-  let obj;
-  try { obj = JSON.parse(match[0]); }
-  catch { throw new Error('解説JSONのパースに失敗'); }
+  const obj = extractJsonObject(text, '解説JSON');
   return {
     praise: String(obj.praise || ''),
     improve: String(obj.improve || ''),
@@ -405,13 +401,59 @@ function mockExplain({ composedPrompt = '', judge }) {
   return { praise, improve, lesson };
 }
 
+/**
+ * Robustly extract the first top-level JSON object from an LLM response.
+ * Handles common failure modes seen with local/cloud models:
+ *   - <think>...</think> reasoning preambles (DeepSeek-R1, QwQ)
+ *   - ```json ... ``` code fences
+ *   - Greedy-regex traps when there's a 2nd `{` later in the text
+ *   - String literals containing `{` or `}`
+ * Throws a descriptive error if nothing parseable is found.
+ */
+export function extractJsonObject(text, label = 'JSON') {
+  if (!text || !text.trim()) {
+    throw new Error(`${label}: 空応答（max_tokens不足や認証エラーの可能性）`);
+  }
+
+  // 1) Strip reasoning blocks.
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+  // 2) Strip enclosing markdown fences.
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/```\s*$/i, '').trim();
+
+  // 3) Walk the first balanced {...}, respecting string literals.
+  const start = cleaned.indexOf('{');
+  if (start < 0) {
+    const preview = cleaned.slice(0, 80).replace(/\s+/g, ' ');
+    throw new Error(`${label}が返されませんでした (応答冒頭: "${preview}")`);
+  }
+  let depth = 0;
+  let end = -1;
+  let inStr = false;
+  let escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (inStr) {
+      if (ch === '\\') escape = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end < 0) throw new Error(`${label}の閉じ括弧が見つかりません`);
+
+  try { return JSON.parse(cleaned.slice(start, end + 1)); }
+  catch (e) { throw new Error(`${label}のパースに失敗: ${e.message}`); }
+}
+
 function parseJudgeResponse(text) {
-  // Extract JSON object
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('判定結果のJSONが見つかりません');
-  let obj;
-  try { obj = JSON.parse(match[0]); }
-  catch { throw new Error('判定結果JSONのパースに失敗'); }
+  const obj = extractJsonObject(text, '採点JSON');
   return {
     accuracy: clampInt(obj.accuracy, 0, 10),
     utility: clampInt(obj.utility, 0, 10),
