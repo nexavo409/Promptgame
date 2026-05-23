@@ -241,7 +241,13 @@ ${output}
       model: MODEL_JUDGE,
       system: JUDGE_SYSTEM,
       messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 400,
+      // The JSON itself fits comfortably in 200 tokens, but reasoning-distilled
+      // models (qwen3.5-*-reasoning-distilled, DeepSeek-R1, QwQ) burn 200-500
+      // tokens on internal thinking BEFORE emitting any content. With a 400
+      // budget they hit finish_reason="length" mid-reasoning and leave content
+      // empty. 2048 gives reasoning models enough headroom while still being
+      // cheap on cloud APIs.
+      max_tokens: 2048,
     });
     return parseJudgeResponse(text);
   } catch (e) {
@@ -278,7 +284,10 @@ ${output}
       model: MODEL_JUDGE,
       system: EXPLAIN_SYSTEM,
       messages: [{ role: 'user', content: userMsg }],
-      max_tokens: 800,
+      // Same reasoning-model headroom concern as judgeOutput: explanation JSON
+      // itself is small but reasoning preambles eat budget. 800 was tight even
+      // when it worked. Bump to 2048.
+      max_tokens: 2048,
     });
     return parseExplainResponse(text);
   } catch (e) {
