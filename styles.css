@@ -99,7 +99,30 @@
 :root[data-theme="dark"] .lesson-num { background: var(--grad-brand-soft); border-color: #4c1d95; color: #c4b5fd; }
 :root[data-theme="dark"] .value-icon { background: var(--grad-brand-soft); border-color: #4c1d95; }
 :root[data-theme="dark"] .prompt-editor textarea { background: #0b1120; color: var(--ink); }
-:root[data-theme="dark"] .settings-popover input { background: #0b1120; color: var(--ink); }
+:root[data-theme="dark"] .settings-popover {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+}
+:root[data-theme="dark"] .settings-popover label { color: var(--ink); }
+:root[data-theme="dark"] .settings-popover input { background: #0b1120; color: var(--ink); border-color: var(--line); }
+:root[data-theme="dark"] .settings-popover code { background: var(--panel-soft); color: #c4b5fd; padding: 1px 4px; border-radius: 3px; }
+/* Default .btn is hardcoded white background — overrides for dark mode so
+   button text doesn't become invisible white-on-white. .primary and .ghost
+   variants already work because primary has a gradient and ghost is transparent.
+   The plain .btn (used for the theme toggle, "解除" clear button, etc.) needs
+   this. */
+:root[data-theme="dark"] .btn {
+  background: var(--panel-soft);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:root[data-theme="dark"] .btn:hover {
+  background: var(--panel);
+  border-color: #4338ca;
+}
+:root[data-theme="dark"] .btn.ghost { background: transparent; }
+:root[data-theme="dark"] .btn.ghost:hover { background: rgba(99, 102, 241, 0.18); }
 :root[data-theme="dark"] .modal input, :root[data-theme="dark"] .modal textarea, :root[data-theme="dark"] .modal select { background: #0b1120; color: var(--ink); }
 :root[data-theme="dark"] .recipe-step-row { background: var(--panel); }
 :root[data-theme="dark"] .result-block.passed { background: linear-gradient(180deg, #052e1f 0%, #1e293b 60%); border-color: #047857; }
