@@ -1,100 +1,80 @@
-// AI client: supports Anthropic API, LM Studio (OpenAI-compatible), and a deterministic mock.
-// Priority: LM Studio URL → Anthropic API key → mock.
-// Browser-side direct call to Anthropic uses anthropic-dangerous-direct-browser-access header.
-// (Acceptable for local single-player playtest. Do not deploy a public site with embedded keys.)
+// AI client: supports Anthropic API, OpenAI-compatible local servers, and a deterministic mock.
+// Priority: OpenAI-compatible URL → Anthropic API key → mock.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL_GENERATE = 'claude-haiku-4-5-20251001';
 const MODEL_JUDGE = 'claude-haiku-4-5-20251001';
 
-// ---- Backend selection ----
-// "openai-compat" covers LM Studio / OpenWebUI / Ollama / vLLM and similar
-// OpenAI-compatible HTTP servers. Key kept as 'pa.lmstudioUrl' for backwards
-// compatibility with existing localStorage values.
-export function getOpenAIURL() {
-  return localStorage.getItem('pa.lmstudioUrl') || '';
-}
+export function getOpenAIURL() { return localStorage.getItem('pa.lmstudioUrl') || ''; }
 export function setOpenAIURL(url) {
   if (url) localStorage.setItem('pa.lmstudioUrl', url.replace(/\/+$/, ''));
   else localStorage.removeItem('pa.lmstudioUrl');
 }
-export function getOpenAIBearer() {
-  return localStorage.getItem('pa.openaiBearer') || '';
-}
+export function getOpenAIBearer() { return localStorage.getItem('pa.openaiBearer') || ''; }
 export function setOpenAIBearer(token) {
   if (token) localStorage.setItem('pa.openaiBearer', token);
   else localStorage.removeItem('pa.openaiBearer');
 }
-// Backwards-compat aliases (in case other modules still reference old names)
 export const getLMStudioURL = getOpenAIURL;
 export const setLMStudioURL = setOpenAIURL;
-
+export function hasApiKey() { return !!localStorage.getItem('pa.apiKey'); }
+export function setApiKey(key) {
+  if (key) localStorage.setItem('pa.apiKey', key);
+  else localStorage.removeItem('pa.apiKey');
+}
+export function getApiKey() { return localStorage.getItem('pa.apiKey') || ''; }
 export function activeBackend() {
   if (getOpenAIURL()) return 'openai-compat';
   if (getApiKey()) return 'anthropic';
   return 'mock';
 }
-export function hasAIBackend() {
-  return activeBackend() !== 'mock';
-}
+export function hasAIBackend() { return activeBackend() !== 'mock'; }
 
-/** Resolve the user-supplied URL to a full chat-completions endpoint. */
 function resolveChatEndpoint(base) {
   const url = base.replace(/\/+$/, '');
-  // If the user gave us a full endpoint, trust it.
   if (/\/chat\/completions$/.test(url)) return url;
-  // Common OpenAI-compatible convention: /v1/chat/completions
   return url + '/v1/chat/completions';
 }
 
 const EXPLAIN_SYSTEM = `あなたはプロンプトエンジニアリングを教える簡潔で実用的な教師です。
-以下のお題・ユーザーが書いたプロンプト・AIの出力・採点結果を見て、
-ユーザーが次の試行でプロンプトを改善できるように短く具体的に講評してください。
-
-含めるべき要素（各 1〜2 文、合計でも 5 文以内）:
-- praise: このプロンプトの良かった点（書き方の具体的な工夫を取り上げる）
-- improve: 次に改善すべき点を 1 つ（プロンプトの実際の言い回しに踏み込んで示す）
-- lesson: このレッスンに関連する汎用的なプロンプト技法を 1 つ
-
-出力は厳密に以下の JSON 形式のみ（前置き・コードブロック・説明文なし）:
+以下のお題・ユーザーが書いたプロンプト・AIの出力・採点結果を見て、次の試行で改善できるように短く具体的に講評してください。
+出力は厳密に以下の JSON 形式のみ:
 {"praise": "...", "improve": "...", "lesson": "..."}`;
 
-const JUDGE_SYSTEM = `あなたはプロンプトエンジニアリング学習アプリの公平な採点者です。
-ユーザーが書いたプロンプトと、それに対するAIの出力を読み、以下3軸でそれぞれ0〜10点の整数で採点してください。
+const JUDGE_SYSTEM = `あなたはプロンプトエンジニアリング学習アプリの厳格な採点者です。
+ユーザーが書いたプロンプトと、それに対するAIの出力を読み、「AIの出力品質」だけではなく「プロンプト自体の設計品質」を重視して採点してください。
 
-- accuracy（正確性）: お題に対する内容の的確さ、事実関係の正しさ、論理整合性
-- utility（有用性）: 実務での活用可能性、具体性、対象読者にとっての価値
-- novelty（独自性）: 出力の工夫、視点の良さ、差別化された切り口
+採点軸:
+- accuracy（正確性）: プロンプトが、お題の目的を正確に伝えられているか。曖昧な依頼、前提不足、対象読者の不明確さがある場合は減点する。AIの出力が正しくても、プロンプトが曖昧なら高得点にしない。
+- utility（有用性）: プロンプトが、実用的で再現性のある出力を引き出せる設計になっているか。出力形式、粒度、対象読者、制約条件、評価観点が明示されているほど高評価。単に「教えてください」だけなら最大6点程度に抑える。
+- novelty（独自性）: プロンプトに独自の視点、比較軸、読者設定、制約、構成上の工夫があるか。一般的な依頼文だけなら最大4点。箇条書き指定だけなら最大6点。明確な切り口や高度な設計がある場合のみ7点以上にする。
 
-採点は甘すぎず、学習者が改善点を理解できるようにしてください。
-お題と無関係な出力、空欄に近い出力、誤情報を含む出力は低く採点してください。
+重要ルール:
+- AIの出力が良くても、プロンプトが単純・曖昧なら高得点にしない。
+- お題をそのまま言い換えただけのプロンプトは、原則として accuracy 6以下、utility 6以下、novelty 4以下。
+- 出力形式を指定している場合は utility を加点する。
+- 対象読者、役割、制約、比較軸、手順、例示がある場合は加点する。
+- 採点は甘くしない。学習者が改善余地を理解できる点数にする。
 
-出力は厳密に以下のJSON形式のみで返してください。説明文・コードブロック・前置きは一切付けないでください。
+出力は厳密に以下のJSON形式のみで返してください。
 {"accuracy": <int 0..10>, "utility": <int 0..10>, "novelty": <int 0..10>, "rationale": "<1〜2文の根拠>"}`;
 
-export function hasApiKey() {
-  return !!localStorage.getItem('pa.apiKey');
-}
+const META_PROMPT_SYSTEM = `あなたはプロンプトエンジニアリングの専門家です。
+与えられたお題に対して、高得点を取れる「お手本となるプロンプト」を 1 つ書いてください。
+含める要素は必要に応じて、役割、出力形式、制約条件、例示、検討手順、対象読者です。
+ルール: プロンプト本文だけを返す。説明・前置き・コードフェンスは付けない。元のお題の意図を尊重する。`;
 
-export function setApiKey(key) {
-  if (key) localStorage.setItem('pa.apiKey', key);
-  else localStorage.removeItem('pa.apiKey');
-}
+const IMPROVE_SYSTEM = `あなたはプロンプトエンジニアリングの実務コーチです。
+ユーザーが書いた既存のプロンプトと、教師からの改善提案を1つ受け取り、その提案だけを丁寧に反映した「改善版プロンプト」を返してください。
+ルール: 元の構造と長さを尊重し、提案以外の変更は最小限にする。説明・前置き・コメント・コードフェンスは付けず、本文のみ返す。`;
 
-export function getApiKey() {
-  return localStorage.getItem('pa.apiKey') || '';
-}
-
-/** Fetch with an abort timeout so a hung backend cannot freeze the UI. */
 async function fetchWithTimeout(url, opts, ms = 120000) {
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), ms);
   try {
     return await fetch(url, { ...opts, signal: ctrl.signal });
   } catch (e) {
-    if (e.name === 'AbortError') {
-      throw new Error(`タイムアウト（${Math.round(ms / 1000)}秒以内に応答なし）`);
-    }
+    if (e.name === 'AbortError') throw new Error(`タイムアウト（${Math.round(ms / 1000)}秒以内に応答なし）`);
     throw e;
   } finally {
     clearTimeout(tid);
@@ -104,7 +84,6 @@ async function fetchWithTimeout(url, opts, ms = 120000) {
 async function callAnthropic({ model, system, messages, max_tokens = 1024 }) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('Anthropic APIキーが設定されていません');
-
   const res = await fetchWithTimeout(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
@@ -115,88 +94,44 @@ async function callAnthropic({ model, system, messages, max_tokens = 1024 }) {
     },
     body: JSON.stringify({ model, max_tokens, system, messages }),
   }, 120000);
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Anthropic API ${res.status}: ${txt}`);
-  }
+  if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
-  return text;
+  return (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
 }
 
 async function callOpenAICompatible({ system, messages, max_tokens = 1024 }) {
   const base = getOpenAIURL();
   if (!base) throw new Error('OpenAI互換サーバーURLが設定されていません');
-  const endpoint = resolveChatEndpoint(base);
-  const fullMessages = system ? [{ role: 'system', content: system }, ...messages] : messages;
-  const token = getOpenAIBearer();
-
   const headers = { 'content-type': 'application/json' };
-  if (token) headers['authorization'] = 'Bearer ' + token;
-
-  // Local LLMs (LM Studio / OpenWebUI / Ollama / vLLM) can be slow; 3 min timeout.
-  const res = await fetchWithTimeout(endpoint, {
+  const token = getOpenAIBearer();
+  if (token) headers.authorization = 'Bearer ' + token;
+  const res = await fetchWithTimeout(resolveChatEndpoint(base), {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      // Most OpenAI-compatible servers ignore this and use the loaded/default
-      // model. Some (OpenWebUI) require it — let users override later if needed.
       model: 'local-model',
-      messages: fullMessages,
+      messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
       max_tokens,
       stream: false,
     }),
   }, 180000);
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`OpenAI互換 ${res.status}: ${txt}`);
-  }
+  if (!res.ok) throw new Error(`OpenAI互換 ${res.status}: ${await res.text()}`);
   const data = await res.json();
   const msg = data.choices?.[0]?.message;
   const finishReason = data.choices?.[0]?.finish_reason;
-
-  // Primary: standard `content` field, with leaked thinking blocks stripped.
-  // Some local models embed reasoning inline in content as <think>...</think>
-  // or "Thinking Process: ..." preambles. Strip both so downstream callers
-  // (improvePrompt, generateAIPrompt) don't display the model's internal monologue.
   let content = stripLeakedThinking(msg?.content || '').trim();
-
-  // Fallback to reasoning_content ONLY when the model finished cleanly
-  // (finish_reason="stop") but content is empty. In that case the
-  // reasoning_content is likely the real answer in disguise.
-  //
-  // DO NOT fall back when finish_reason="length" — that means the model
-  // was cut off mid-thinking, so reasoning_content is incomplete English
-  // internal monologue (NOT the user-facing answer). Returning it would
-  // leak the model's "Thinking Process: 1. Analyze..." trace as the result.
-  if (!content && msg?.reasoning_content && finishReason === 'stop') {
-    content = msg.reasoning_content.trim();
-  }
-
-  // If we still have nothing AND the model was cut off, throw with a
-  // clear hint so the caller can show the user actionable guidance.
+  if (!content && msg?.reasoning_content && finishReason === 'stop') content = msg.reasoning_content.trim();
   if (!content && finishReason === 'length') {
     throw new Error('reasoning モデルがトークン予算を全て内部思考に費やし、出力が切り捨てられました (finish_reason=length)。max_tokens を増やすか、非 reasoning モデルへの切り替えをお試しください。');
   }
-
   return content;
 }
 
-/** Strip leaked <think>...</think> blocks and "Thinking Process:" preambles
- *  that some reasoning models emit inside the user-facing `content` field. */
 function stripLeakedThinking(text) {
   if (!text) return '';
-  let s = text;
-  // <think>...</think> blocks (DeepSeek-R1 style)
-  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  // "Thinking Process:" English preamble followed by numbered steps,
-  // ending at the first blank line + non-list content (the actual answer).
-  // Matches the failure mode seen in production logs.
-  s = s.replace(/^\s*Thinking Process:[\s\S]*?(?=\n\n[^\d\s\-*])/i, '');
-  return s;
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/^\s*Thinking Process:[\s\S]*?(?=\n\n[^\d\s\-*])/i, '');
 }
 
-/** Dispatch to whichever backend is configured. */
 async function callBackend(opts) {
   const backend = activeBackend();
   if (backend === 'openai-compat') return callOpenAICompatible(opts);
@@ -204,30 +139,12 @@ async function callBackend(opts) {
   throw new Error('AIバックエンドが設定されていません');
 }
 
-/**
- * Generate an output for a composed prompt.
- */
 export async function generateOutput(composedPrompt) {
-  if (!hasAIBackend()) {
-    return mockGenerate(composedPrompt);
-  }
+  if (!hasAIBackend()) return mockGenerate(composedPrompt);
   try {
-    const text = await callBackend({
-      model: MODEL_GENERATE,
-      messages: [{ role: 'user', content: composedPrompt }],
-      // Lesson outputs (FAQs, structured explanations, multi-step analyses)
-      // can run 5-8k tokens. Be generous to avoid mid-sentence truncation.
-      max_tokens: 8192,
-    });
-    // Empty content reaching the judge always scores 0/0/0 with a confusing
-    // rationale. Surface the problem here instead so the user can react
-    // (e.g. switch models, increase max_tokens server-side).
+    const text = await callBackend({ model: MODEL_GENERATE, messages: [{ role: 'user', content: composedPrompt }], max_tokens: 8192 });
     if (!text || !text.trim()) {
-      return [
-        '【AIが応答本文を生成しませんでした】',
-        'reasoning モデルがトークン予算を全て内部思考に費やし、出力欄が空のまま返ってきた可能性があります。',
-        '対策: より小さな reasoning モデル / 非 reasoning モデルに切り替える、または LM Studio 側で max_tokens を増やす。',
-      ].join('\n');
+      return ['【AIが応答本文を生成しませんでした】', 'reasoning モデルがトークン予算を全て内部思考に費やし、出力欄が空のまま返ってきた可能性があります。', '対策: より小さな reasoning モデル / 非 reasoning モデルに切り替える、または LM Studio 側で max_tokens を増やす。'].join('\n');
     }
     return text;
   } catch (e) {
@@ -235,284 +152,176 @@ export async function generateOutput(composedPrompt) {
   }
 }
 
-/**
- * Judge an output. Returns { accuracy, utility, novelty, rationale }.
- */
 export async function judgeOutput({ topic, composedPrompt, output }) {
-  if (!hasAIBackend()) {
-    return mockJudge({ topic, composedPrompt, output });
-  }
-  // Short-circuit if generation produced no output. Asking the judge to
-  // score an empty response always returns 0/0/0 with a rationale that
-  // makes the user think the app is broken — give them the real reason.
+  if (!hasAIBackend()) return mockJudge({ topic, composedPrompt, output });
   if (!output || !output.trim()) {
-    return {
-      accuracy: 0, utility: 0, novelty: 0,
-      rationale: 'AIが応答本文を生成しなかったため採点できません。reasoning モデルがトークン予算を内部思考に使い切った可能性があります。より小さい reasoning モデル / 非 reasoning モデルへの切り替えをお試しください。',
-    };
+    return { accuracy: 0, utility: 0, novelty: 0, rationale: 'AIが応答本文を生成しなかったため採点できません。reasoning モデルがトークン予算を内部思考に使い切った可能性があります。' };
   }
-  const userMsg = `# お題
-${topic.title}
-${topic.brief}
-
-# ユーザーが書いたプロンプト
-${composedPrompt}
-
-# AIの出力
-${output}
-
-上記を採点してください。JSONのみを返答してください。`;
-
+  const userMsg = `# お題\n${topic.title}\n${topic.brief}\n\n# ユーザーが書いたプロンプト\n${composedPrompt}\n\n# AIの出力\n${output}\n\n上記を採点してください。JSONのみを返答してください。`;
   try {
-    const text = await callBackend({
-      model: MODEL_JUDGE,
-      system: JUDGE_SYSTEM,
-      messages: [{ role: 'user', content: userMsg }],
-      // The JSON itself fits comfortably in 200 tokens, but reasoning-distilled
-      // models (qwen3.5-*-reasoning-distilled, DeepSeek-R1, QwQ) burn 200-500
-      // tokens on internal thinking BEFORE emitting any content. With a 400
-      // budget they hit finish_reason="length" mid-reasoning and leave content
-      // empty. 2048 gives reasoning models enough headroom while still being
-      // cheap on cloud APIs.
-      max_tokens: 2048,
-    });
-    return parseJudgeResponse(text);
+    const text = await callBackend({ model: MODEL_JUDGE, system: JUDGE_SYSTEM, messages: [{ role: 'user', content: userMsg }], max_tokens: 2048 });
+    return applyPromptQualityCaps(parseJudgeResponse(text), composedPrompt, topic);
   } catch (e) {
     const fallback = mockJudge({ topic, composedPrompt, output });
-    fallback.rationale = `[API判定失敗のためモック採点] ${e.message}`;
+    fallback.rationale = `[API判定失敗のためモック採点] ${e.message} ${fallback.rationale || ''}`.trim();
     return fallback;
   }
 }
 
-/**
- * Generate a teaching explanation for a single attempt.
- * Returns { praise, improve, lesson } strings.
- */
 export async function explainResult({ topic, composedPrompt, output, judge }) {
-  if (!hasAIBackend()) return mockExplain({ topic, composedPrompt, output, judge });
-  const userMsg = `# お題
-${topic.title}（${topic.category} / ${topic.difficulty}）
-${topic.brief}
-
-# ユーザーが書いたプロンプト
-${composedPrompt}
-
-# AIの出力
-${output}
-
-# 採点結果
-正しさ ${judge.accuracy} / 役立ち ${judge.utility} / 新しさ ${judge.novelty} / 計 ${judge.accuracy + judge.utility + judge.novelty} 点
-判定根拠: ${judge.rationale || ''}
-
-このプロンプトについて、初心者にわかりやすい教師として講評してください。JSON のみで返答。`;
-
+  if (!hasAIBackend()) return mockExplain({ composedPrompt, judge });
+  const userMsg = `# お題\n${topic.title}（${topic.category} / ${topic.difficulty}）\n${topic.brief}\n\n# ユーザーが書いたプロンプト\n${composedPrompt}\n\n# AIの出力\n${output}\n\n# 採点結果\n正しさ ${judge.accuracy} / 役立ち ${judge.utility} / 新しさ ${judge.novelty} / 計 ${judge.accuracy + judge.utility + judge.novelty} 点\n判定根拠: ${judge.rationale || ''}\n\nこのプロンプトについて、初心者にわかりやすい教師として講評してください。JSON のみで返答。`;
   try {
-    const text = await callBackend({
-      model: MODEL_JUDGE,
-      system: EXPLAIN_SYSTEM,
-      messages: [{ role: 'user', content: userMsg }],
-      // Same reasoning-model headroom concern as judgeOutput: explanation JSON
-      // itself is small but reasoning preambles eat budget. 800 was tight even
-      // when it worked. Bump to 2048.
-      max_tokens: 2048,
-    });
+    const text = await callBackend({ model: MODEL_JUDGE, system: EXPLAIN_SYSTEM, messages: [{ role: 'user', content: userMsg }], max_tokens: 2048 });
     return parseExplainResponse(text);
   } catch (e) {
-    const fallback = mockExplain({ topic, composedPrompt, output, judge });
+    const fallback = mockExplain({ composedPrompt, judge });
     fallback.lesson = `[API解説失敗のためモック] ${fallback.lesson}`;
     return fallback;
   }
 }
 
-const META_PROMPT_SYSTEM = `あなたはプロンプトエンジニアリングの専門家です。
-与えられたお題に対して、高得点を取れる「お手本となるプロンプト」を 1 つ書いてください。
-
-含めるべき要素（必要に応じて取捨選択）:
-- 役割の付与 ("あなたは○○です")
-- 出力形式の明示 (箇条書き / 表 / 段落数など)
-- 制約条件 (字数・禁止事項など)
-- 必要なら例示 (Few-shot) や段階的な検討手順
-- 対象読者の明確化
-
-ルール:
-- プロンプト本文だけを返す
-- 説明・前置き・コードフェンスは一切付けない
-- 元のお題の意図を尊重する`;
-
-/**
- * Have the AI write its own prompt for the given topic. Used for "AI vs You".
- */
 export async function generateAIPrompt(topic) {
   if (!hasAIBackend()) return mockAIPrompt(topic);
-  const userMsg = `お題: ${topic.title}
-${topic.brief}
-
-このお題に対する高品質なプロンプトを 1 つ書いてください。`;
+  const userMsg = `お題: ${topic.title}\n${topic.brief}\n\nこのお題に対する高品質なプロンプトを 1 つ書いてください。`;
   try {
-    const text = await callBackend({
-      model: MODEL_GENERATE,
-      system: META_PROMPT_SYSTEM,
-      messages: [{ role: 'user', content: userMsg }],
-      // Full prompt output can be 500-1000 tokens. With reasoning models
-      // adding 1500-3000 thinking tokens on top, 2048 is too tight and
-      // gets cut off mid-prompt. 4096 gives enough headroom.
-      max_tokens: 4096,
-    });
-    return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+    const text = await callBackend({ model: MODEL_GENERATE, system: META_PROMPT_SYSTEM, messages: [{ role: 'user', content: userMsg }], max_tokens: 4096 });
+    return stripCodeFence(text);
   } catch (e) {
     return mockAIPrompt(topic);
   }
 }
 
-function mockAIPrompt(topic) {
-  return `あなたは ${topic.category === 'tech' ? '経験豊富なシニアエンジニア' :
-          topic.category === 'business' ? '実務経験豊富なコンサルタント' :
-          topic.category === 'education' ? 'ベテランの教育者' :
-          topic.category === 'creative' ? 'プロのライター' :
-          topic.category === 'academic' ? '学術研究者' : '専門家'} です。
-
-お題: ${topic.title}
-${topic.brief}
-
-以下の構造で回答してください:
-1. 概要 (3行以内で要点を提示)
-2. 詳細 (箇条書き 3〜5項目で展開)
-3. 結論・推奨アクション
-
-対象読者: 想定される初学者にも理解できるよう、専門用語は補足してください。
-制約: 推測や憶測は明示し、事実と意見を分けてください。`;
-}
-
-const IMPROVE_SYSTEM = `あなたはプロンプトエンジニアリングの実務コーチです。
-ユーザーが書いた既存のプロンプトと、教師からの改善提案を1つ受け取り、
-その提案だけを丁寧に反映した「改善版プロンプト」を返してください。
-
-ルール:
-- 元のプロンプトの構造と長さを尊重し、提案以外の部分は最小限の変更にとどめる
-- 提案を 1 つだけ反映する（推測で勝手に追加機能を入れない）
-- 説明・前置き・コメントは一切書かず、改善版プロンプトの本文のみを返す
-- コードブロック・引用符で囲まず、生のテキストで返す`;
-
-/**
- * Rewrite the user's prompt by applying a single teacher-suggested improvement.
- * Returns the improved prompt as plain text (no markdown wrapping).
- */
 export async function improvePrompt({ prompt, improveAdvice, topic }) {
   if (!hasAIBackend()) return mockImprovePrompt({ prompt, improveAdvice });
-  const userMsg = `# 元のプロンプト
-${prompt}
-
-# 教師からの改善提案
-${improveAdvice}
-
-# お題（参考）
-${topic.title}: ${topic.brief}
-
-上記の改善提案を反映した「改善版プロンプト」だけを出力してください。`;
-
+  const userMsg = `# 元のプロンプト\n${prompt}\n\n# 教師からの改善提案\n${improveAdvice}\n\n# お題（参考）\n${topic.title}: ${topic.brief}\n\n上記の改善提案を反映した「改善版プロンプト」だけを出力してください。`;
   try {
-    const text = await callBackend({
-      model: MODEL_GENERATE,
-      system: IMPROVE_SYSTEM,
-      messages: [{ role: 'user', content: userMsg }],
-      // The output IS the entire improved prompt (often 500-1500 tokens).
-      // With reasoning models doing 1500-3000 thinking tokens first, 2048
-      // gets cut off mid-prompt and the reasoning_content leak fallback
-      // ends up serving the user the model's English "Thinking Process:"
-      // monologue. 4096 gives reasoning models room to finish.
-      max_tokens: 4096,
-    });
-    // Strip code-fence wrapping if the model added it anyway.
-    return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+    const text = await callBackend({ model: MODEL_GENERATE, system: IMPROVE_SYSTEM, messages: [{ role: 'user', content: userMsg }], max_tokens: 4096 });
+    return stripCodeFence(text);
   } catch (e) {
-    // Don't silently fall back to mock — surface the reason so the user
-    // knows it's not just "the AI gave a boring answer". The most common
-    // cause is reasoning models eating the token budget; the error message
-    // from callOpenAICompatible already explains that.
     return `${prompt}\n\n[改善版生成エラー: ${e.message}]\n（元のプロンプトをそのまま返しています）`;
   }
 }
 
-function mockImprovePrompt({ prompt, improveAdvice }) {
-  return `${prompt}\n\n[モック改善版 — 実APIで利用するとここに改善版が表示されます]\n（教師からの提案: ${improveAdvice}）`;
+function stripCodeFence(text) {
+  return String(text || '').trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```\s*$/, '').trim();
+}
+
+function analyzePromptFeatures(prompt) {
+  return {
+    hasRole: /あなたは|として|専門家|コンサルタント|教師|エンジニア|管理栄養士|ライター|you are/i.test(prompt),
+    hasFormat: /箇条書き|表|JSON|Markdown|形式|構成|段落|項目|リスト/.test(prompt),
+    hasConstraint: /以内|禁止|使わない|含める|除外|制約|条件|だけ|必ず/.test(prompt),
+    hasExample: /例|入力|出力|サンプル|例えば|few-shot/i.test(prompt),
+    hasSteps: /ステップ|手順|順に|まず|次に|最後に|Step/i.test(prompt),
+    hasAudience: /初心者|小学生|中学生|経営者|読者|対象|向け|ユーザー/.test(prompt),
+    hasPerspective: /比較|観点|メリット|デメリット|リスク|注意点|批判的|中立的/.test(prompt),
+    hasSelfCritique: /下書き|弱点|自己批評|批評|改善版|見直し|レビュー/.test(prompt),
+  };
+}
+
+function countPromptFeatures(features) { return Object.values(features).filter(Boolean).length; }
+
+function applyPromptQualityCaps(judge, prompt, topic = null) {
+  const features = analyzePromptFeatures(prompt || '');
+  const featureCount = countPromptFeatures(features);
+  const capped = { ...judge };
+  if (featureCount === 0) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 4);
+    capped.rationale = appendRationale(capped.rationale, 'プロンプト自体が単純で、役割・出力形式・制約・対象読者などの設計要素が不足しています。');
+  } else if (featureCount === 1 && features.hasFormat) {
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, '出力形式は指定されていますが、独自の視点や対象読者の指定はまだ限定的です。');
+  }
+  return applyLessonSpecificCaps(capped, features, featureCount, topic);
+}
+
+function applyLessonSpecificCaps(judge, features, featureCount, topic) {
+  const lessonRule = getLessonSpecificRule(topic);
+  if (!lessonRule) return judge;
+  const capped = { ...judge };
+
+  if (lessonRule === 'role' && !features.hasRole) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは役割指定が中心技法ですが、プロンプト内で明確な役割が指定されていません。');
+  }
+  if (lessonRule === 'format' && !features.hasFormat) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは出力構造の指定が中心技法ですが、箇条書き・表・JSONなどの形式指定が不足しています。');
+  }
+  if (lessonRule === 'example' && !features.hasExample) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンではFew-shot例示が中心技法ですが、入力例・出力例などの具体例が不足しています。');
+  }
+  if (lessonRule === 'constraint' && !features.hasConstraint) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは制約指定が中心技法ですが、字数・禁止事項・条件などの制約が不足しています。');
+  }
+  if (lessonRule === 'steps' && !features.hasSteps) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは検討手順の指定が中心技法ですが、ステップや順序の指定が不足しています。');
+  }
+  if (lessonRule === 'selfCritique' && !(features.hasSteps && features.hasSelfCritique)) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは下書き→自己批評→改善版の流れが中心技法ですが、その3段階構成が不足しています。');
+  }
+  if (lessonRule === 'integrated') {
+    if (featureCount < 3) {
+      capped.accuracy = Math.min(capped.accuracy, 7);
+      capped.utility = Math.min(capped.utility, 7);
+      capped.novelty = Math.min(capped.novelty, 6);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは複数技法の組み合わせが求められますが、確認できる設計要素が少なめです。');
+    }
+    if (!features.hasFormat) {
+      capped.utility = Math.min(capped.utility, 7);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは、出力形式を明示すると再現性が上がります。');
+    }
+    if (!features.hasConstraint) {
+      capped.utility = Math.min(capped.utility, 7);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは、制約条件を明示すると回答品質が安定します。');
+    }
+  }
+  return capped;
+}
+
+function getLessonSpecificRule(topic) {
+  const title = topic?.title || '';
+  if (title.includes('平日の夕食メニュー提案')) return 'role';
+  if (title.includes('部屋干しのコツ')) return 'format';
+  if (title.includes('レビューを定型に変換')) return 'example';
+  if (title.includes('AIを小学生に説明')) return 'constraint';
+  if (title.includes('子供の誕生日パーティー企画')) return 'steps';
+  if (title.includes('家族旅行プランの推敲')) return 'selfCritique';
+  if (title.includes('結婚祝いメッセージ')) return 'integrated';
+  return null;
+}
+
+function appendRationale(base, extra) {
+  if (!base) return extra;
+  if (base.includes(extra)) return base;
+  return `${base} ${extra}`;
 }
 
 function parseExplainResponse(text) {
   const obj = extractJsonObject(text, '解説JSON');
-  return {
-    praise: String(obj.praise || ''),
-    improve: String(obj.improve || ''),
-    lesson: String(obj.lesson || ''),
-  };
+  return { praise: String(obj.praise || ''), improve: String(obj.improve || ''), lesson: String(obj.lesson || '') };
 }
 
-function mockExplain({ composedPrompt = '', judge }) {
-  const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
-  const len = composedPrompt.length;
-  const hasRole = /あなたは|として|役割|persona|you are/i.test(composedPrompt);
-  const hasFormat = /箇条書き|表|json|markdown|形式で|フォーマット|段落|字以内|文字以内/.test(composedPrompt);
-  const hasConstraint = /しない|使わない|禁止|以内|限定|だけ/.test(composedPrompt);
-  const hasExample = /例(\d|:|：)|例えば|input.*output|example/i.test(composedPrompt);
-
-  // Praise: pick what looks well-done
-  let praise = 'お題に対してプロンプトを書き、AIに具体的な指示を出せています。';
-  if (hasRole && hasFormat) praise = '「役割」と「出力形式」の両方を明示できており、AIが回答の方向性をつかみやすいプロンプトです。';
-  else if (hasRole) praise = '冒頭で役割を与えており、回答の専門性と視点が定まりやすいプロンプトです。';
-  else if (hasFormat) praise = '出力形式を明示できており、後から使い回せる構造的な回答を引き出せています。';
-  else if (hasExample) praise = '具体例を示すFew-shot的な指示ができており、AIが形式を真似しやすい構成です。';
-  else if (len > 200) praise = '一定の情報量があるプロンプトで、お題の文脈をAIに渡せています。';
-
-  // Improve: pick the lowest-hanging fruit
-  let improve = '次は「役割」「出力形式」「制約」のうち、まだ書いていないものを1つ加えると安定します。';
-  if (judge.accuracy < 7) improve = '前提条件や禁止事項を明示すると、誤解や曖昧な回答を減らせます（例: 「事実に基づき、推測は明示せよ」）。';
-  else if (judge.utility < 7) improve = '実務で使いやすくするため、箇条書き・表・手順番号など出力形式を指定してみましょう。';
-  else if (judge.novelty < 7) improve = '視点を1つ加える（「初学者向け」「批判的に」など）と、ありきたりでない切り口が出やすくなります。';
-  else if (!hasExample) improve = '出力例を1〜2個示すFew-shot形式にすると、AIが期待する形式を確実に真似てくれます。';
-  else if (!hasConstraint) improve = '「○○しない」「△△字以内」など制約を1つ追加すると、回答がさらに引き締まります。';
-
-  const lessons = [
-    'プロンプトは「目的・対象読者・出力形式」を明示するだけで安定します。',
-    'AIに役割を与えると、回答の専門性と視点が定まりやすくなります。',
-    '制約条件（字数・禁止事項）は書いた分だけ回答が引き締まります。',
-    '入出力例を1〜2個示すと、AIは形式やトーンを真似しやすくなります。',
-    '一度で完成を狙わず、出力を見てプロンプトを修正していくのが上達の近道です。',
-    '「ステップ1: ... / ステップ2: ...」と検討手順を指定すると、抜け漏れが減ります。',
-  ];
-  const lesson = `[モック解説] ${lessons[(len + total) % lessons.length]}`;
-
-  return { praise, improve, lesson };
-}
-
-/**
- * Robustly extract the first top-level JSON object from an LLM response.
- * Handles common failure modes seen with local/cloud models:
- *   - <think>...</think> reasoning preambles (DeepSeek-R1, QwQ)
- *   - ```json ... ``` code fences
- *   - Greedy-regex traps when there's a 2nd `{` later in the text
- *   - String literals containing `{` or `}`
- * Throws a descriptive error if nothing parseable is found.
- */
 export function extractJsonObject(text, label = 'JSON') {
-  if (!text || !text.trim()) {
-    throw new Error(`${label}: 空応答（max_tokens不足や認証エラーの可能性）`);
-  }
-
-  // 1) Strip reasoning blocks.
+  if (!text || !text.trim()) throw new Error(`${label}: 空応答（max_tokens不足や認証エラーの可能性）`);
   let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-  // 2) Strip enclosing markdown fences.
   cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/```\s*$/i, '').trim();
-
-  // 3) Walk the first balanced {...}, respecting string literals.
   const start = cleaned.indexOf('{');
-  if (start < 0) {
-    const preview = cleaned.slice(0, 80).replace(/\s+/g, ' ');
-    throw new Error(`${label}が返されませんでした (応答冒頭: "${preview}")`);
-  }
-  let depth = 0;
-  let end = -1;
-  let inStr = false;
-  let escape = false;
+  if (start < 0) throw new Error(`${label}が返されませんでした (応答冒頭: "${cleaned.slice(0, 80).replace(/\s+/g, ' ')}")`);
+  let depth = 0, end = -1, inStr = false, escape = false;
   for (let i = start; i < cleaned.length; i++) {
     const ch = cleaned[i];
     if (escape) { escape = false; continue; }
@@ -529,19 +338,13 @@ export function extractJsonObject(text, label = 'JSON') {
     }
   }
   if (end < 0) throw new Error(`${label}の閉じ括弧が見つかりません`);
-
   try { return JSON.parse(cleaned.slice(start, end + 1)); }
   catch (e) { throw new Error(`${label}のパースに失敗: ${e.message}`); }
 }
 
 function parseJudgeResponse(text) {
   const obj = extractJsonObject(text, '採点JSON');
-  return {
-    accuracy: clampInt(obj.accuracy, 0, 10),
-    utility: clampInt(obj.utility, 0, 10),
-    novelty: clampInt(obj.novelty, 0, 10),
-    rationale: obj.rationale || '',
-  };
+  return { accuracy: clampInt(obj.accuracy, 0, 10), utility: clampInt(obj.utility, 0, 10), novelty: clampInt(obj.novelty, 0, 10), rationale: obj.rationale || '' };
 }
 
 function clampInt(v, lo, hi) {
@@ -549,33 +352,64 @@ function clampInt(v, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-// ===== Mock fallback =====
-// Deterministic — derived from composed prompt content for repeatability without API.
-
 function mockGenerate(composedPrompt) {
-  const hash = simpleHash(composedPrompt);
   const samples = [
     '【モック出力】依頼内容を踏まえ、要点を3つに整理しました。\n1. 主要な論点の特定\n2. 根拠データの提示\n3. 実行可能な推奨アクション\nなお本出力はモックであり、実運用にはAPIキー設定を推奨します。',
     '【モック出力】お題について以下の観点で整理しました。背景・現状分析・提案・期待効果・リスクの順で記述しています（簡略版）。実APIではより具体的な出力が得られます。',
     '【モック出力】指示された構造に従いつつ、最も重要な結論を冒頭に置きました。詳細はAPIキー設定後にお試しください。',
   ];
-  return samples[hash % samples.length];
+  return samples[simpleHash(composedPrompt) % samples.length];
 }
 
 function mockJudge({ topic, composedPrompt, output }) {
-  // Heuristic: longer & more category-aligned prompts get higher scores.
-  const hash = simpleHash(composedPrompt + output);
   const len = composedPrompt.length;
   const categoryHits = (composedPrompt.match(new RegExp(topic.category, 'g')) || []).length;
   const base = 5 + Math.min(3, Math.floor(len / 400)) + Math.min(2, categoryHits);
-
-  const jitter = (seed, range) => ((simpleHash(composedPrompt + seed) % (range * 2 + 1)) - range);
-  return {
+  const jitter = (seed, range) => ((simpleHash(composedPrompt + output + seed) % (range * 2 + 1)) - range);
+  const raw = {
     accuracy: clampInt(base + jitter('a', 2), 0, 10),
     utility: clampInt(base + jitter('u', 2), 0, 10),
     novelty: clampInt(base - 1 + jitter('n', 2), 0, 10),
     rationale: `[モック採点] 文量${len}文字、お題カテゴリ言及${categoryHits}回をベースに採点。APIキー設定で本格採点が可能です。`,
   };
+  return applyPromptQualityCaps(raw, composedPrompt, topic);
+}
+
+function mockExplain({ composedPrompt = '', judge }) {
+  const total = (judge.accuracy || 0) + (judge.utility || 0) + (judge.novelty || 0);
+  const len = composedPrompt.length;
+  const features = analyzePromptFeatures(composedPrompt);
+  let praise = 'お題に対してプロンプトを書き、AIに指示を出せています。';
+  if (features.hasRole && features.hasFormat) praise = '「役割」と「出力形式」の両方を明示できており、AIが回答の方向性をつかみやすいプロンプトです。';
+  else if (features.hasRole) praise = '冒頭で役割を与えており、回答の専門性と視点が定まりやすいプロンプトです。';
+  else if (features.hasFormat) praise = '出力形式を明示できており、後から使い回せる構造的な回答を引き出せています。';
+  else if (features.hasExample) praise = '具体例を示すFew-shot的な指示ができており、AIが形式を真似しやすい構成です。';
+  else if (len > 200) praise = '一定の情報量があるプロンプトで、お題の文脈をAIに渡せています。';
+
+  let improve = '次は「役割」「出力形式」「制約」のうち、まだ書いていないものを1つ加えると安定します。';
+  if (judge.accuracy < 7) improve = '前提条件や禁止事項を明示すると、誤解や曖昧な回答を減らせます。';
+  else if (judge.utility < 7) improve = '実務で使いやすくするため、箇条書き・表・手順番号など出力形式を指定してみましょう。';
+  else if (judge.novelty < 7) improve = '対象読者や比較観点を1つ加えると、ありきたりでない切り口が出やすくなります。';
+  else if (!features.hasExample) improve = '出力例を1〜2個示すFew-shot形式にすると、AIが期待する形式を確実に真似てくれます。';
+  else if (!features.hasConstraint) improve = '「○○しない」「△△字以内」など制約を1つ追加すると、回答がさらに引き締まります。';
+  const lessons = [
+    'プロンプトは「目的・対象読者・出力形式」を明示するだけで安定します。',
+    'AIに役割を与えると、回答の専門性と視点が定まりやすくなります。',
+    '制約条件（字数・禁止事項）は書いた分だけ回答が引き締まります。',
+    '入出力例を1〜2個示すと、AIは形式やトーンを真似しやすくなります。',
+    '一度で完成を狙わず、出力を見てプロンプトを修正していくのが上達の近道です。',
+    '「ステップ1: ... / ステップ2: ...」と検討手順を指定すると、抜け漏れが減ります。',
+  ];
+  return { praise, improve, lesson: `[モック解説] ${lessons[(len + total) % lessons.length]}` };
+}
+
+function mockAIPrompt(topic) {
+  const role = topic.category === 'tech' ? '経験豊富なシニアエンジニア' : topic.category === 'business' ? '実務経験豊富なコンサルタント' : topic.category === 'education' ? 'ベテランの教育者' : topic.category === 'creative' ? 'プロのライター' : topic.category === 'academic' ? '学術研究者' : '専門家';
+  return `あなたは ${role} です。\n\nお題: ${topic.title}\n${topic.brief}\n\n以下の構造で回答してください:\n1. 概要 (3行以内で要点を提示)\n2. 詳細 (箇条書き 3〜5項目で展開)\n3. 結論・推奨アクション\n\n対象読者: 想定される初学者にも理解できるよう、専門用語は補足してください。\n制約: 推測や憶測は明示し、事実と意見を分けてください。`;
+}
+
+function mockImprovePrompt({ prompt, improveAdvice }) {
+  return `${prompt}\n\n[モック改善版 — 実APIで利用するとここに改善版が表示されます]\n（教師からの提案: ${improveAdvice}）`;
 }
 
 function simpleHash(s) {
