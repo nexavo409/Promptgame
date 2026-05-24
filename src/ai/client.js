@@ -160,7 +160,7 @@ export async function judgeOutput({ topic, composedPrompt, output }) {
   const userMsg = `# お題\n${topic.title}\n${topic.brief}\n\n# ユーザーが書いたプロンプト\n${composedPrompt}\n\n# AIの出力\n${output}\n\n上記を採点してください。JSONのみを返答してください。`;
   try {
     const text = await callBackend({ model: MODEL_JUDGE, system: JUDGE_SYSTEM, messages: [{ role: 'user', content: userMsg }], max_tokens: 2048 });
-    return applyPromptQualityCaps(parseJudgeResponse(text), composedPrompt);
+    return applyPromptQualityCaps(parseJudgeResponse(text), composedPrompt, topic);
   } catch (e) {
     const fallback = mockJudge({ topic, composedPrompt, output });
     fallback.rationale = `[API判定失敗のためモック採点] ${e.message} ${fallback.rationale || ''}`.trim();
@@ -216,12 +216,13 @@ function analyzePromptFeatures(prompt) {
     hasSteps: /ステップ|手順|順に|まず|次に|最後に|Step/i.test(prompt),
     hasAudience: /初心者|小学生|中学生|経営者|読者|対象|向け|ユーザー/.test(prompt),
     hasPerspective: /比較|観点|メリット|デメリット|リスク|注意点|批判的|中立的/.test(prompt),
+    hasSelfCritique: /下書き|弱点|自己批評|批評|改善版|見直し|レビュー/.test(prompt),
   };
 }
 
 function countPromptFeatures(features) { return Object.values(features).filter(Boolean).length; }
 
-function applyPromptQualityCaps(judge, prompt) {
+function applyPromptQualityCaps(judge, prompt, topic = null) {
   const features = analyzePromptFeatures(prompt || '');
   const featureCount = countPromptFeatures(features);
   const capped = { ...judge };
@@ -230,14 +231,77 @@ function applyPromptQualityCaps(judge, prompt) {
     capped.utility = Math.min(capped.utility, 6);
     capped.novelty = Math.min(capped.novelty, 4);
     capped.rationale = appendRationale(capped.rationale, 'プロンプト自体が単純で、役割・出力形式・制約・対象読者などの設計要素が不足しています。');
-    return capped;
-  }
-  if (featureCount === 1 && features.hasFormat) {
+  } else if (featureCount === 1 && features.hasFormat) {
     capped.novelty = Math.min(capped.novelty, 6);
     capped.rationale = appendRationale(capped.rationale, '出力形式は指定されていますが、独自の視点や対象読者の指定はまだ限定的です。');
-    return capped;
+  }
+  return applyLessonSpecificCaps(capped, features, featureCount, topic);
+}
+
+function applyLessonSpecificCaps(judge, features, featureCount, topic) {
+  const lessonRule = getLessonSpecificRule(topic);
+  if (!lessonRule) return judge;
+  const capped = { ...judge };
+
+  if (lessonRule === 'role' && !features.hasRole) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは役割指定が中心技法ですが、プロンプト内で明確な役割が指定されていません。');
+  }
+  if (lessonRule === 'format' && !features.hasFormat) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは出力構造の指定が中心技法ですが、箇条書き・表・JSONなどの形式指定が不足しています。');
+  }
+  if (lessonRule === 'example' && !features.hasExample) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンではFew-shot例示が中心技法ですが、入力例・出力例などの具体例が不足しています。');
+  }
+  if (lessonRule === 'constraint' && !features.hasConstraint) {
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは制約指定が中心技法ですが、字数・禁止事項・条件などの制約が不足しています。');
+  }
+  if (lessonRule === 'steps' && !features.hasSteps) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは検討手順の指定が中心技法ですが、ステップや順序の指定が不足しています。');
+  }
+  if (lessonRule === 'selfCritique' && !(features.hasSteps && features.hasSelfCritique)) {
+    capped.accuracy = Math.min(capped.accuracy, 6);
+    capped.utility = Math.min(capped.utility, 6);
+    capped.novelty = Math.min(capped.novelty, 6);
+    capped.rationale = appendRationale(capped.rationale, 'このレッスンでは下書き→自己批評→改善版の流れが中心技法ですが、その3段階構成が不足しています。');
+  }
+  if (lessonRule === 'integrated') {
+    if (featureCount < 3) {
+      capped.accuracy = Math.min(capped.accuracy, 7);
+      capped.utility = Math.min(capped.utility, 7);
+      capped.novelty = Math.min(capped.novelty, 6);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは複数技法の組み合わせが求められますが、確認できる設計要素が少なめです。');
+    }
+    if (!features.hasFormat) {
+      capped.utility = Math.min(capped.utility, 7);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは、出力形式を明示すると再現性が上がります。');
+    }
+    if (!features.hasConstraint) {
+      capped.utility = Math.min(capped.utility, 7);
+      capped.rationale = appendRationale(capped.rationale, '統合チャレンジでは、制約条件を明示すると回答品質が安定します。');
+    }
   }
   return capped;
+}
+
+function getLessonSpecificRule(topic) {
+  const title = topic?.title || '';
+  if (title.includes('平日の夕食メニュー提案')) return 'role';
+  if (title.includes('部屋干しのコツ')) return 'format';
+  if (title.includes('レビューを定型に変換')) return 'example';
+  if (title.includes('AIを小学生に説明')) return 'constraint';
+  if (title.includes('子供の誕生日パーティー企画')) return 'steps';
+  if (title.includes('家族旅行プランの推敲')) return 'selfCritique';
+  if (title.includes('結婚祝いメッセージ')) return 'integrated';
+  return null;
 }
 
 function appendRationale(base, extra) {
@@ -308,7 +372,7 @@ function mockJudge({ topic, composedPrompt, output }) {
     novelty: clampInt(base - 1 + jitter('n', 2), 0, 10),
     rationale: `[モック採点] 文量${len}文字、お題カテゴリ言及${categoryHits}回をベースに採点。APIキー設定で本格採点が可能です。`,
   };
-  return applyPromptQualityCaps(raw, composedPrompt);
+  return applyPromptQualityCaps(raw, composedPrompt, topic);
 }
 
 function mockExplain({ composedPrompt = '', judge }) {
