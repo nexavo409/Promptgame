@@ -51,10 +51,6 @@ export function resetLesson(lessonId) {
   }
 }
 
-export function resetAll(lessonIds) {
-  for (const id of lessonIds) resetLesson(id);
-}
-
 // ===== Draft auto-save =====
 // Saves the user's in-progress prompt per lesson / mode so a page refresh
 // (or LM Studio hiccup) doesn't blow away their typing.

@@ -16,7 +16,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Run validation tests
+        run: node scripts/validate.mjs
+
   deploy:
+    needs: validate
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,11 +38,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Stage site (browser-only files)
+        run: |
+          mkdir -p _site
+          cp index.html styles.css _site/
+          cp -r src _site/
+          # README is nice to keep for anyone landing on the repo URL
+          cp README.md _site/ 2>/dev/null || true
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Static site — serve repo root as-is.
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment

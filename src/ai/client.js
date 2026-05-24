@@ -15,8 +15,6 @@ export function setOpenAIBearer(token) {
   if (token) localStorage.setItem('pa.openaiBearer', token);
   else localStorage.removeItem('pa.openaiBearer');
 }
-export const getLMStudioURL = getOpenAIURL;
-export const setLMStudioURL = setOpenAIURL;
 export function hasApiKey() { return !!localStorage.getItem('pa.apiKey'); }
 export function setApiKey(key) {
   if (key) localStorage.setItem('pa.apiKey', key);

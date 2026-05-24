@@ -728,10 +728,6 @@ KPI に与える影響、コスト、ROI の観点。
   },
 ];
 
-export function getPromptById(id) {
-  return PROMPT_LIBRARY.find(p => p.id === id) || null;
-}
-
 export function getPromptsByCategory(categoryId) {
   return PROMPT_LIBRARY.filter(p => p.category === categoryId);
 }
