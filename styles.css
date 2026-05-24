@@ -150,7 +150,18 @@ html, body {
 :root[data-theme="dark"] .diff-line.diff-eq { color: #94a3b8; }
 :root[data-theme="dark"] .diff-line.diff-add { background: #052e1f; color: #6ee7b7; }
 :root[data-theme="dark"] .diff-line.diff-del { background: #422006; color: #fca5a5; }
-:root[data-theme="dark"] .diff-body { background: #0b1120; }
+:root[data-theme="dark"] .diff-body { background: #0b1120; border-color: var(--line); }
+/* The outer diff panel (white in light mode) needs to flip in dark mode,
+   otherwise the header "試行 #4 → #5" and legend text inherit dark-mode
+   light ink color and become invisible on white. */
+:root[data-theme="dark"] .diff-panel {
+  background: var(--panel);
+  border-color: #4338ca;
+  color: var(--ink);
+}
+:root[data-theme="dark"] .diff-head { color: var(--ink); }
+:root[data-theme="dark"] .diff-head .delta-up { color: #6ee7b7; }
+:root[data-theme="dark"] .diff-head .delta-down { color: #fca5a5; }
 :root[data-theme="dark"] .vs-detail summary { color: #fcd34d; }
 :root[data-theme="dark"] .vs-detail pre { background: #0b1120; color: var(--ink); border-color: var(--line); }
 :root[data-theme="dark"] .vs-tip { background: rgba(255, 255, 255, 0.05); }
